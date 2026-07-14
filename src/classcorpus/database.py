@@ -48,6 +48,14 @@ CREATE VIRTUAL TABLE IF NOT EXISTS slide_fts USING fts5(
     speaker_notes,
     visual_description
 );
+
+CREATE TABLE IF NOT EXISTS slide_embeddings (
+    slide_id INTEGER NOT NULL REFERENCES slides(id) ON DELETE CASCADE,
+    model_name TEXT NOT NULL,
+    dimension INTEGER NOT NULL CHECK(dimension >= 1),
+    vector BLOB NOT NULL,
+    PRIMARY KEY(slide_id, model_name)
+);
 """
 
 

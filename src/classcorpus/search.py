@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from classcorpus.database import Database
+from classcorpus.embeddings import Encoder, semantic_ranking
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,7 @@ def search(
     *,
     course: str | None = None,
     limit: int = 8,
+    encoder: Encoder | None = None,
 ) -> list[SearchResult]:
     match_query = _fts_query(query)
     if limit < 1:
@@ -71,7 +73,33 @@ def search(
         """,
         parameters,
     ).fetchall()
-    return [SearchResult(**dict(row)) for row in rows]
+    fts_results = [SearchResult(**dict(row)) for row in rows]
+    if encoder is None:
+        return fts_results
+
+    semantic_ids = semantic_ranking(
+        database,
+        query,
+        encoder,
+        course=course,
+    )
+    rankings = [
+        [result.slide_id for result in fts_results],
+        semantic_ids,
+    ]
+    fused = reciprocal_rank_fusion(rankings)
+    ordered_ids = sorted(fused, key=lambda slide_id: (-fused[slide_id], slide_id))[
+        :limit
+    ]
+    by_id = {result.slide_id: result for result in fts_results}
+    missing_ids = [slide_id for slide_id in ordered_ids if slide_id not in by_id]
+    if missing_ids:
+        by_id.update(_results_by_id(database, missing_ids))
+    return [
+        replace(by_id[slide_id], score=fused[slide_id])
+        for slide_id in ordered_ids
+        if slide_id in by_id
+    ]
 
 
 def _fts_query(query: str) -> str:
@@ -81,4 +109,51 @@ def _fts_query(query: str) -> str:
     return " OR ".join(f'"{token}"' for token in tokens)
 
 
-__all__ = ["SearchResult", "search"]
+def reciprocal_rank_fusion(
+    rankings: list[list[int]],
+    *,
+    constant: int = 60,
+) -> dict[int, float]:
+    scores: dict[int, float] = {}
+    for ranking in rankings:
+        for rank, slide_id in enumerate(ranking, start=1):
+            scores[slide_id] = scores.get(slide_id, 0.0) + 1.0 / (constant + rank)
+    return scores
+
+
+def _results_by_id(
+    database: Database,
+    slide_ids: list[int],
+) -> dict[int, SearchResult]:
+    placeholders = ",".join("?" for _ in slide_ids)
+    rows = database.connection.execute(
+        f"""
+        SELECT
+            slides.id AS slide_id,
+            courses.name AS course,
+            source_files.relative_path AS source_file,
+            source_files.source_path,
+            slides.ordinal,
+            slides.kind,
+            slides.title,
+            slides.body_text,
+            slides.speaker_notes,
+            slides.visual_description,
+            slides.render_path,
+            slides.vision_status,
+            slides.title AS snippet,
+            0.0 AS score
+        FROM slides
+        JOIN source_files ON source_files.id = slides.source_file_id
+        JOIN courses ON courses.id = source_files.course_id
+        WHERE slides.id IN ({placeholders})
+        """,
+        slide_ids,
+    ).fetchall()
+    return {
+        int(row["slide_id"]): SearchResult(**dict(row))
+        for row in rows
+    }
+
+
+__all__ = ["SearchResult", "reciprocal_rank_fusion", "search"]

@@ -19,6 +19,10 @@ dev = [
     "pytest>=8,<10",
     "ruff>=0.5,<1",
 ]
+embeddings = [
+    "numpy>=2,<3",
+    "sentence-transformers>=3,<4",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
