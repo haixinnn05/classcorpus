@@ -12,3 +12,10 @@ def test_render_directory_is_stable(monkeypatch, tmp_path):
     assert render_directory("Algorithms", "abc123") == (
         tmp_path / "renders" / "algorithms" / "abc123"
     )
+
+
+def test_render_directory_falls_back_to_course_slug(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLASSCORPUS_DATA_DIR", str(tmp_path))
+    assert render_directory("  !!!  ", "abc123") == (
+        tmp_path / "renders" / "course" / "abc123"
+    )
