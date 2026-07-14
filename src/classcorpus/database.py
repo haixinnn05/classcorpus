@@ -1,10 +1,11 @@
 import sqlite3
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 from classcorpus.models import SlideRecord, SourceFingerprint
-from classcorpus.paths import database_path
+from classcorpus.paths import data_root, database_path
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -293,3 +294,39 @@ class Database:
             (course_name,),
         ).fetchone()
         return int(row["count"])
+
+
+def remove_course_data(
+    database: Database,
+    course_name: str,
+    *,
+    confirmed: bool,
+) -> bool:
+    if not confirmed:
+        return False
+
+    rows = database.connection.execute(
+        """
+        SELECT slides.render_path
+        FROM slides
+        JOIN source_files ON source_files.id = slides.source_file_id
+        JOIN courses ON courses.id = source_files.course_id
+        WHERE courses.name = ? AND slides.render_path IS NOT NULL
+        """,
+        (course_name,),
+    ).fetchall()
+    render_root = (data_root() / "renders").resolve()
+    render_directories: set[Path] = set()
+    for row in rows:
+        render_path = Path(row["render_path"]).expanduser().resolve()
+        if not render_path.is_relative_to(render_root):
+            raise ValueError(
+                f"refusing to delete generated path outside ClassCorpus data directory: "
+                f"{render_path}"
+            )
+        render_directories.add(render_path.parent)
+
+    for directory in sorted(render_directories, key=lambda path: len(path.parts), reverse=True):
+        if directory.exists():
+            shutil.rmtree(directory)
+    return database.remove_course(course_name)

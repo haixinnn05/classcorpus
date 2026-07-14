@@ -1,0 +1,52 @@
+# Contributing To ClassCorpus
+
+ClassCorpus welcomes focused contributions that preserve its skill-first,
+local-default architecture.
+
+## Development Setup
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+```
+
+Run the release checks before submitting a change:
+
+```bash
+.venv/bin/ruff check src scripts tests
+.venv/bin/python -m pytest -q
+```
+
+## Change Workflow
+
+1. Open an issue before a large parser, storage, or workflow change.
+2. Write a failing behavioral test first.
+3. Implement the smallest change that passes it.
+4. Run focused tests, then the complete suite once.
+5. Keep commits scoped and explain privacy or compatibility implications.
+
+## Architectural Boundaries
+
+- Keep `SKILL.md` as the user-facing product entry point.
+- Do not add a custom chatbot, application UI, hosted backend, or telemetry.
+- Keep baseline search usable without embeddings or cloud APIs.
+- Never modify lecture source files.
+- Keep visual analysis opt-in and provider-neutral.
+- Preserve exact source paths and one-based page/slide citations.
+
+## Test Materials
+
+Use generated or freely redistributable fixtures. Never commit private course
+materials, customer data, credentials, or copyrighted lecture decks without
+clear redistribution rights.
+
+## New Parsers
+
+Keep native extraction and rendering separate. Return `SlideRecord` instances,
+preserve source order, isolate failures to one source file, and add generated
+golden fixtures covering metadata and citations.
+
+## Reporting Security Or Privacy Issues
+
+Do not include sensitive lecture content in a public issue. Describe the
+behavior with a minimal synthetic reproduction.

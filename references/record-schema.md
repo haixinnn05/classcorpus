@@ -69,3 +69,12 @@ python scripts/build_embeddings.py COURSE [--model MODEL] --json
 
 This command requires the `embeddings` optional dependency group. Baseline
 indexing and full-text search never require a model download.
+
+## Remove Course Data
+
+```text
+python scripts/remove_course.py COURSE --confirm --json
+```
+
+Returns `removed: true` when generated records existed. Omitting `--confirm`
+returns a JSON error and leaves all generated and source data unchanged.

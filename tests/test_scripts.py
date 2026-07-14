@@ -130,3 +130,43 @@ def test_script_errors_use_json_envelope(tmp_path: Path):
     assert result.returncode == 1
     assert payload["ok"] is False
     assert payload["error"]["type"] == "ValueError"
+
+
+def test_remove_course_script_requires_confirmation_and_preserves_source(
+    tmp_path: Path,
+):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    source = make_pdf_fixture(course / "handout.pdf")
+    original = source.read_bytes()
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    refused = run_script(
+        "remove_course.py",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    removed = run_script(
+        "remove_course.py",
+        "Algorithms",
+        "--confirm",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    assert refused.returncode == 1
+    assert json.loads(refused.stdout)["ok"] is False
+    assert removed.returncode == 0
+    assert json.loads(removed.stdout)["removed"] is True
+    assert source.read_bytes() == original
