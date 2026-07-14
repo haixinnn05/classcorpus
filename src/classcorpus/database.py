@@ -1,7 +1,9 @@
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 
+from classcorpus.models import SlideRecord, SourceFingerprint
 from classcorpus.paths import database_path
 
 SCHEMA = """
@@ -107,3 +109,179 @@ class Database:
                 (name,),
             )
         return cursor.rowcount > 0
+
+    def source_is_current(
+        self,
+        course_id: int,
+        relative_path: str,
+        fingerprint: SourceFingerprint,
+    ) -> bool:
+        row = self.connection.execute(
+            """
+            SELECT sha256, parser_version, status
+            FROM source_files
+            WHERE course_id = ? AND relative_path = ?
+            """,
+            (course_id, relative_path),
+        ).fetchone()
+        return bool(
+            row
+            and row["status"] == "ready"
+            and row["sha256"] == fingerprint.sha256
+            and row["parser_version"] == fingerprint.parser_version
+        )
+
+    def replace_source(
+        self,
+        course_id: int,
+        relative_path: str,
+        source_path: Path,
+        fingerprint: SourceFingerprint,
+        slides: Sequence[SlideRecord],
+    ) -> None:
+        with self.connection:
+            source_row = self.connection.execute(
+                """
+                SELECT id FROM source_files
+                WHERE course_id = ? AND relative_path = ?
+                """,
+                (course_id, relative_path),
+            ).fetchone()
+            if source_row is not None:
+                self.connection.execute(
+                    """
+                    DELETE FROM slide_fts
+                    WHERE slide_id IN (
+                        SELECT id FROM slides WHERE source_file_id = ?
+                    )
+                    """,
+                    (source_row["id"],),
+                )
+                self.connection.execute(
+                    "DELETE FROM slides WHERE source_file_id = ?",
+                    (source_row["id"],),
+                )
+
+            self.connection.execute(
+                """
+                INSERT INTO source_files(
+                    course_id, relative_path, source_path, size, mtime_ns,
+                    sha256, parser_version, status, error_message
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'ready', NULL)
+                ON CONFLICT(course_id, relative_path) DO UPDATE SET
+                    source_path = excluded.source_path,
+                    size = excluded.size,
+                    mtime_ns = excluded.mtime_ns,
+                    sha256 = excluded.sha256,
+                    parser_version = excluded.parser_version,
+                    status = 'ready',
+                    error_message = NULL
+                """,
+                (
+                    course_id,
+                    relative_path,
+                    str(source_path.resolve()),
+                    fingerprint.size,
+                    fingerprint.mtime_ns,
+                    fingerprint.sha256,
+                    fingerprint.parser_version,
+                ),
+            )
+            source_id = self.connection.execute(
+                """
+                SELECT id FROM source_files
+                WHERE course_id = ? AND relative_path = ?
+                """,
+                (course_id, relative_path),
+            ).fetchone()["id"]
+
+            for slide in slides:
+                cursor = self.connection.execute(
+                    """
+                    INSERT INTO slides(
+                        source_file_id, ordinal, kind, title, body_text,
+                        speaker_notes, visual_description, render_path,
+                        vision_status
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        source_id,
+                        slide.ordinal,
+                        slide.kind,
+                        slide.title,
+                        slide.body_text,
+                        slide.speaker_notes,
+                        slide.visual_description,
+                        slide.render_path,
+                        "complete" if slide.visual_description else "pending",
+                    ),
+                )
+                slide_id = cursor.lastrowid
+                self.connection.execute(
+                    """
+                    INSERT INTO slide_fts(
+                        slide_id, title, body_text, speaker_notes,
+                        visual_description
+                    )
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        slide_id,
+                        slide.title,
+                        slide.body_text,
+                        slide.speaker_notes,
+                        slide.visual_description or "",
+                    ),
+                )
+
+    def record_source_error(
+        self,
+        course_id: int,
+        relative_path: str,
+        source_path: Path,
+        fingerprint: SourceFingerprint,
+        message: str,
+    ) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO source_files(
+                    course_id, relative_path, source_path, size, mtime_ns,
+                    sha256, parser_version, status, error_message
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'failed', ?)
+                ON CONFLICT(course_id, relative_path) DO UPDATE SET
+                    source_path = excluded.source_path,
+                    size = excluded.size,
+                    mtime_ns = excluded.mtime_ns,
+                    sha256 = excluded.sha256,
+                    parser_version = excluded.parser_version,
+                    status = 'failed',
+                    error_message = excluded.error_message
+                """,
+                (
+                    course_id,
+                    relative_path,
+                    str(source_path.resolve()),
+                    fingerprint.size,
+                    fingerprint.mtime_ns,
+                    fingerprint.sha256,
+                    fingerprint.parser_version,
+                    message,
+                ),
+            )
+
+    def slide_count(self, course_name: str) -> int:
+        row = self.connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM slides
+            JOIN source_files ON source_files.id = slides.source_file_id
+            JOIN courses ON courses.id = source_files.course_id
+            WHERE courses.name = ?
+            """,
+            (course_name,),
+        ).fetchone()
+        return int(row["count"])
