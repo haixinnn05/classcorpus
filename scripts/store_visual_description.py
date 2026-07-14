@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 
-from _common import emit, fail
+from _common import argument_parser, emit, fail
 from classcorpus.database import Database
 from classcorpus.vision import store_descriptions
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Store agent-authored slide descriptions.")
+    parser = argument_parser(description="Store agent-authored slide descriptions.")
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--json", action="store_true", dest="json_mode")
     args = parser.parse_args()

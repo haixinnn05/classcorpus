@@ -14,6 +14,8 @@ class SearchResult:
     course: str
     source_file: str
     source_path: str
+    source_status: str
+    source_error: str | None
     ordinal: int
     kind: Literal["slide", "page"]
     title: str
@@ -31,18 +33,29 @@ def search(
     query: str,
     *,
     course: str | None = None,
+    source_file: str | None = None,
+    ordinal: int | None = None,
     limit: int = 8,
     encoder: Encoder | None = None,
 ) -> list[SearchResult]:
     match_query = _fts_query(query)
     if limit < 1:
         raise ValueError("limit must be at least 1")
+    if ordinal is not None and ordinal < 1:
+        raise ValueError("ordinal must be at least 1")
 
     parameters: list[object] = [match_query]
-    course_clause = ""
+    filter_clauses: list[str] = []
     if course is not None:
-        course_clause = "AND courses.name = ?"
+        filter_clauses.append("courses.name = ?")
         parameters.append(course)
+    if source_file is not None:
+        filter_clauses.append("source_files.relative_path = ?")
+        parameters.append(source_file)
+    if ordinal is not None:
+        filter_clauses.append("slides.ordinal = ?")
+        parameters.append(ordinal)
+    filter_sql = "".join(f" AND {clause}" for clause in filter_clauses)
     parameters.append(limit)
 
     rows = database.connection.execute(
@@ -52,6 +65,8 @@ def search(
             courses.name AS course,
             source_files.relative_path AS source_file,
             source_files.source_path,
+            source_files.status AS source_status,
+            source_files.error_message AS source_error,
             slides.ordinal,
             slides.kind,
             slides.title,
@@ -67,7 +82,7 @@ def search(
         JOIN source_files ON source_files.id = slides.source_file_id
         JOIN courses ON courses.id = source_files.course_id
         WHERE slide_fts MATCH ?
-        {course_clause}
+        {filter_sql}
         ORDER BY bm25(slide_fts), slides.id
         LIMIT ?
         """,
@@ -82,6 +97,8 @@ def search(
         query,
         encoder,
         course=course,
+        source_file=source_file,
+        ordinal=ordinal,
     )
     rankings = [
         [result.slide_id for result in fts_results],
@@ -133,6 +150,8 @@ def _results_by_id(
             courses.name AS course,
             source_files.relative_path AS source_file,
             source_files.source_path,
+            source_files.status AS source_status,
+            source_files.error_message AS source_error,
             slides.ordinal,
             slides.kind,
             slides.title,

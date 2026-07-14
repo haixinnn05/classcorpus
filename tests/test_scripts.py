@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from tests.fixtures.make_fixtures import make_pdf_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,6 +132,247 @@ def test_script_errors_use_json_envelope(tmp_path: Path):
     assert result.returncode == 1
     assert payload["ok"] is False
     assert payload["error"]["type"] == "ValueError"
+
+
+def test_partial_sync_returns_failure_envelope_with_summary(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "good.pdf")
+    (course / "corrupt.pdf").write_bytes(b"not a pdf")
+
+    result = run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert payload["ok"] is False
+    assert payload["error"]["type"] == "PartialSyncError"
+    assert payload["indexed"] == 1
+    assert payload["failed"] == 1
+    assert len(payload["failures"]) == 1
+
+
+def test_empty_search_tells_agent_to_synchronize(tmp_path: Path):
+    result = run_script(
+        "search_lectures.py",
+        "memoization",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0
+    assert payload["results"] == []
+    assert payload["sync_required"] is True
+    assert "index_lectures.py" in payload["message"]
+
+
+def test_indexed_no_match_suggests_alternative_terms_without_sync(
+    tmp_path: Path,
+):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_script(
+        "search_lectures.py",
+        "quaternion topology",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0
+    assert payload["results"] == []
+    assert payload["sync_required"] is False
+    assert "alternative terms" in payload["message"]
+
+
+def test_failed_refresh_requests_sync_and_marks_results_stale(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    source = make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    source.write_bytes(b"not a pdf")
+    failed_sync = run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_script(
+        "search_lectures.py",
+        "negative edges",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert failed_sync.returncode == 1
+    assert result.returncode == 0
+    assert payload["sync_required"] is True
+    assert payload["warnings"][0]["type"] == "source_failed"
+    assert payload["results"][0]["source_status"] == "failed"
+    assert payload["results"][0]["source_error"]
+
+
+def test_ready_results_are_not_described_as_stale_when_other_source_failed(
+    tmp_path: Path,
+):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    good = make_pdf_fixture(course / "good.pdf")
+    bad = make_pdf_fixture(course / "bad.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    bad.write_bytes(b"not a pdf")
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_script(
+        "search_lectures.py",
+        "negative edges",
+        "--course",
+        "Algorithms",
+        "--source",
+        good.name,
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["sync_required"] is True
+    assert {item["source_status"] for item in payload["results"]} == {"ready"}
+    assert "returned results are from ready sources" in payload["message"].lower()
+
+
+def test_search_script_accepts_source_and_ordinal_filters(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_script(
+        "search_lectures.py",
+        "negative edges",
+        "--course",
+        "Algorithms",
+        "--source",
+        "handout.pdf",
+        "--ordinal",
+        "2",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0, result.stderr
+    assert payload["results"][0]["source_file"] == "handout.pdf"
+    assert payload["results"][0]["ordinal"] == 2
+
+
+def test_semantic_search_explains_missing_optional_dependencies(tmp_path: Path):
+    result = run_script(
+        "search_lectures.py",
+        "memoization",
+        "--semantic",
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert payload["error"]["type"] == "RuntimeError"
+    assert ".[embeddings]" in payload["error"]["message"]
+
+
+@pytest.mark.parametrize(
+    ("script", "arguments"),
+    [
+        ("index_lectures.py", ("--unknown", "--json")),
+        ("search_lectures.py", ("--unknown", "--json")),
+        ("build_embeddings.py", ("--unknown", "--json")),
+        ("vision_queue.py", ("--unknown", "--json")),
+        ("store_visual_description.py", ("--unknown", "--json")),
+        ("remove_course.py", ("--unknown", "--json")),
+    ],
+)
+def test_argument_errors_use_json_envelope(
+    tmp_path: Path,
+    script: str,
+    arguments: tuple[str, ...],
+):
+    result = run_script(
+        script,
+        *arguments,
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert result.stderr == ""
+    assert payload["ok"] is False
+    assert payload["error"]["type"] == "ArgumentError"
 
 
 def test_remove_course_script_requires_confirmation_and_preserves_source(

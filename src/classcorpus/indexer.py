@@ -7,7 +7,7 @@ from pathlib import Path
 from classcorpus.database import Database
 from classcorpus.models import SourceFingerprint
 from classcorpus.parsers import parse_source
-from classcorpus.paths import render_directory
+from classcorpus.paths import create_render_generation
 
 PARSER_VERSION = "1"
 SUPPORTED_SUFFIXES = {".pdf", ".pptx"}
@@ -19,6 +19,7 @@ class SyncReport:
     skipped: int
     failed: int
     failures: tuple[dict[str, str], ...]
+    warnings: tuple[dict[str, str], ...]
 
 
 def fingerprint(path: Path) -> SourceFingerprint:
@@ -47,43 +48,114 @@ def sync_course(
     course = database.upsert_course(name, root)
     indexed = skipped = failed = 0
     failures: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
 
     sources = sorted(
         path
         for path in root.rglob("*")
         if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES
     )
+    present_relative_paths = {
+        source.relative_to(root).as_posix()
+        for source in sources
+    }
+    _, cleanup_warnings = database.remove_missing_sources(
+        course.id,
+        present_relative_paths,
+    )
+    warnings.extend(cleanup_warnings)
     for source in sources:
         relative_path = source.relative_to(root).as_posix()
-        current_fingerprint = fingerprint(source)
-        if database.source_is_current(
-            course.id,
-            relative_path,
-            current_fingerprint,
-        ):
-            skipped += 1
-            continue
-
+        current_fingerprint: SourceFingerprint | None = None
+        render_dir: Path | None = None
+        source_warnings: list[dict[str, str]] = []
         try:
+            current_fingerprint = fingerprint(source)
+            if database.source_is_current(
+                course.id,
+                relative_path,
+                current_fingerprint,
+                source,
+            ):
+                skipped += 1
+                continue
+
+            render_dir = create_render_generation(
+                name,
+                current_fingerprint.sha256,
+                current_fingerprint.parser_version,
+            )
             slides = parse_source(
                 source,
-                render_directory(name, current_fingerprint.sha256),
+                render_dir,
             )
-            database.replace_source(
-                course.id,
-                relative_path,
-                source,
-                current_fingerprint,
-                slides,
+            if (
+                source.suffix.lower() == ".pptx"
+                and slides
+                and not any(slide.render_path for slide in slides)
+            ):
+                source_warnings.append(
+                    {
+                        "path": str(source),
+                        "type": "renderer_unavailable",
+                        "message": (
+                            "PowerPoint text was indexed without slide images. "
+                            "Install LibreOffice and ensure 'soffice' is on PATH "
+                            "to enable visual analysis."
+                        ),
+                    }
+                )
+            for slide in slides:
+                if not any(
+                    (
+                        slide.title.strip(),
+                        slide.body_text.strip(),
+                        slide.speaker_notes.strip(),
+                    )
+                ):
+                    source_warnings.append(
+                        {
+                            "path": str(source),
+                            "ordinal": str(slide.ordinal),
+                            "type": "image_only",
+                            "message": (
+                                f"{slide.kind.title()} {slide.ordinal} has no "
+                                "extractable text; use opt-in visual analysis."
+                            ),
+                        }
+                    )
+            if not any(slide.render_path for slide in slides):
+                source_warnings.extend(
+                    database.cleanup_render_directories({render_dir})
+                )
+            source_warnings.extend(
+                database.replace_source(
+                    course.id,
+                    relative_path,
+                    source,
+                    current_fingerprint,
+                    slides,
+                )
             )
         except Exception as error:
-            database.record_source_error(
-                course.id,
-                relative_path,
-                source,
-                current_fingerprint,
-                str(error),
-            )
+            if render_dir is not None:
+                warnings.extend(database.cleanup_render_directories({render_dir}))
+            if current_fingerprint is None:
+                database.mark_source_error(
+                    course.id,
+                    relative_path,
+                    source,
+                    PARSER_VERSION,
+                    str(error),
+                )
+            else:
+                database.record_source_error(
+                    course.id,
+                    relative_path,
+                    source,
+                    current_fingerprint,
+                    str(error),
+                )
             failed += 1
             failures.append(
                 {
@@ -94,12 +166,14 @@ def sync_course(
             )
         else:
             indexed += 1
+            warnings.extend(source_warnings)
 
     return SyncReport(
         indexed=indexed,
         skipped=skipped,
         failed=failed,
         failures=tuple(failures),
+        warnings=tuple(warnings),
     )
 
 

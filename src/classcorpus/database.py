@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS slide_embeddings (
     vector BLOB NOT NULL,
     PRIMARY KEY(slide_id, model_name)
 );
+
+CREATE TABLE IF NOT EXISTS pending_deletions (
+    path TEXT PRIMARY KEY
+);
 """
 
 
@@ -65,6 +69,13 @@ class Course:
     id: int
     name: str
     source_root: str
+
+
+@dataclass(frozen=True, slots=True)
+class SourceHealth:
+    total: int
+    ready: int
+    failed: int
 
 
 class Database:
@@ -124,21 +135,33 @@ class Database:
         course_id: int,
         relative_path: str,
         fingerprint: SourceFingerprint,
+        source_path: Path,
     ) -> bool:
         row = self.connection.execute(
             """
-            SELECT sha256, parser_version, status
+            SELECT sha256, parser_version, status, source_path
             FROM source_files
             WHERE course_id = ? AND relative_path = ?
             """,
             (course_id, relative_path),
         ).fetchone()
-        return bool(
+        is_current = bool(
             row
             and row["status"] == "ready"
             and row["sha256"] == fingerprint.sha256
             and row["parser_version"] == fingerprint.parser_version
         )
+        resolved_source = str(source_path.expanduser().resolve())
+        if is_current and row["source_path"] != resolved_source:
+            with self.connection:
+                self.connection.execute(
+                    """
+                    UPDATE source_files SET source_path = ?
+                    WHERE course_id = ? AND relative_path = ?
+                    """,
+                    (resolved_source, course_id, relative_path),
+                )
+        return is_current
 
     def replace_source(
         self,
@@ -147,7 +170,8 @@ class Database:
         source_path: Path,
         fingerprint: SourceFingerprint,
         slides: Sequence[SlideRecord],
-    ) -> None:
+    ) -> tuple[dict[str, str], ...]:
+        old_render_directories: set[Path] = set()
         with self.connection:
             source_row = self.connection.execute(
                 """
@@ -157,6 +181,9 @@ class Database:
                 (course_id, relative_path),
             ).fetchone()
             if source_row is not None:
+                old_render_directories = self._source_render_directories(
+                    int(source_row["id"])
+                )
                 self.connection.execute(
                     """
                     DELETE FROM slide_fts
@@ -244,6 +271,7 @@ class Database:
                         slide.visual_description or "",
                     ),
                 )
+        return self.cleanup_render_directories(old_render_directories)
 
     def record_source_error(
         self,
@@ -282,6 +310,186 @@ class Database:
                 ),
             )
 
+    def mark_source_error(
+        self,
+        course_id: int,
+        relative_path: str,
+        source_path: Path,
+        parser_version: str,
+        message: str,
+    ) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO source_files(
+                    course_id, relative_path, source_path, size, mtime_ns,
+                    sha256, parser_version, status, error_message
+                )
+                VALUES (?, ?, ?, 0, 0, '', ?, 'failed', ?)
+                ON CONFLICT(course_id, relative_path) DO UPDATE SET
+                    source_path = excluded.source_path,
+                    status = 'failed',
+                    error_message = excluded.error_message
+                """,
+                (
+                    course_id,
+                    relative_path,
+                    str(source_path.expanduser().resolve()),
+                    parser_version,
+                    message,
+                ),
+            )
+
+    def remove_missing_sources(
+        self,
+        course_id: int,
+        present_relative_paths: set[str],
+    ) -> tuple[int, tuple[dict[str, str], ...]]:
+        parameters: list[object] = [course_id]
+        present_clause = ""
+        if present_relative_paths:
+            placeholders = ",".join("?" for _ in present_relative_paths)
+            present_clause = f"AND relative_path NOT IN ({placeholders})"
+            parameters.extend(sorted(present_relative_paths))
+        rows = self.connection.execute(
+            f"""
+            SELECT id FROM source_files
+            WHERE course_id = ? {present_clause}
+            """,
+            parameters,
+        ).fetchall()
+        source_ids = [int(row["id"]) for row in rows]
+        if not source_ids:
+            return 0, ()
+        render_directories: set[Path] = set()
+        for source_id in source_ids:
+            render_directories.update(self._source_render_directories(source_id))
+        placeholders = ",".join("?" for _ in source_ids)
+        with self.connection:
+            self.connection.execute(
+                f"""
+                DELETE FROM slide_fts
+                WHERE slide_id IN (
+                    SELECT id FROM slides
+                    WHERE source_file_id IN ({placeholders})
+                )
+                """,
+                source_ids,
+            )
+            self.connection.execute(
+                f"DELETE FROM source_files WHERE id IN ({placeholders})",
+                source_ids,
+            )
+        cleanup_warnings = self.cleanup_render_directories(render_directories)
+        return len(source_ids), cleanup_warnings
+
+    def cleanup_render_directories(
+        self,
+        directories: set[Path],
+    ) -> tuple[dict[str, str], ...]:
+        if not directories:
+            return ()
+        warnings: list[dict[str, str]] = []
+        try:
+            rows = self.connection.execute(
+                "SELECT render_path FROM slides WHERE render_path IS NOT NULL"
+            ).fetchall()
+            referenced = {
+                Path(row["render_path"]).expanduser().resolve().parent
+                for row in rows
+            }
+        except (OSError, TypeError, ValueError, sqlite3.Error) as error:
+            return (
+                {
+                    "path": str(data_root() / "renders"),
+                    "type": "cache_cleanup_failed",
+                    "message": str(error),
+                },
+            )
+        for directory in sorted(
+            directories,
+            key=lambda path: len(path.parts),
+            reverse=True,
+        ):
+            try:
+                resolved = _validated_render_directory(directory)
+                if resolved not in referenced and resolved.exists():
+                    shutil.rmtree(resolved)
+            except (OSError, ValueError) as error:
+                warnings.append(
+                    {
+                        "path": str(directory),
+                        "type": "cache_cleanup_failed",
+                        "message": str(error),
+                    }
+                )
+        return tuple(warnings)
+
+    def schedule_course_removal(
+        self,
+        name: str,
+        render_directories: set[Path],
+    ) -> bool:
+        with self.connection:
+            for directory in render_directories:
+                self.connection.execute(
+                    "INSERT OR IGNORE INTO pending_deletions(path) VALUES (?)",
+                    (str(_validated_render_directory(directory)),),
+                )
+            self.connection.execute(
+                """
+                DELETE FROM slide_fts
+                WHERE slide_id IN (
+                    SELECT slides.id
+                    FROM slides
+                    JOIN source_files ON source_files.id = slides.source_file_id
+                    JOIN courses ON courses.id = source_files.course_id
+                    WHERE courses.name = ?
+                )
+                """,
+                (name,),
+            )
+            cursor = self.connection.execute(
+                "DELETE FROM courses WHERE name = ?",
+                (name,),
+            )
+        return cursor.rowcount > 0
+
+    def cleanup_pending_deletions(self) -> int:
+        rows = self.connection.execute(
+            "SELECT path FROM pending_deletions ORDER BY path"
+        ).fetchall()
+        referenced = {
+            Path(row["render_path"]).expanduser().resolve().parent
+            for row in self.connection.execute(
+                "SELECT render_path FROM slides WHERE render_path IS NOT NULL"
+            )
+        }
+        cleaned = 0
+        for row in rows:
+            directory = _validated_render_directory(Path(row["path"]))
+            if directory not in referenced and directory.exists():
+                shutil.rmtree(directory)
+            with self.connection:
+                self.connection.execute(
+                    "DELETE FROM pending_deletions WHERE path = ?",
+                    (row["path"],),
+                )
+            cleaned += 1
+        return cleaned
+
+    def _source_render_directories(self, source_file_id: int) -> set[Path]:
+        return {
+            Path(row["render_path"]).expanduser().resolve().parent
+            for row in self.connection.execute(
+                """
+                SELECT render_path FROM slides
+                WHERE source_file_id = ? AND render_path IS NOT NULL
+                """,
+                (source_file_id,),
+            )
+        }
+
     def slide_count(self, course_name: str) -> int:
         row = self.connection.execute(
             """
@@ -294,6 +502,67 @@ class Database:
             (course_name,),
         ).fetchone()
         return int(row["count"])
+
+    def source_health(self, course_name: str | None = None) -> SourceHealth:
+        parameters: list[object] = []
+        course_clause = ""
+        if course_name is not None:
+            course_clause = "WHERE courses.name = ?"
+            parameters.append(course_name)
+        row = self.connection.execute(
+            f"""
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN source_files.status = 'ready' THEN 1 ELSE 0 END)
+                    AS ready,
+                SUM(CASE WHEN source_files.status = 'failed' THEN 1 ELSE 0 END)
+                    AS failed
+            FROM source_files
+            JOIN courses ON courses.id = source_files.course_id
+            {course_clause}
+            """,
+            parameters,
+        ).fetchone()
+        return SourceHealth(
+            total=int(row["total"] or 0),
+            ready=int(row["ready"] or 0),
+            failed=int(row["failed"] or 0),
+        )
+
+    def source_failures(
+        self,
+        course_name: str | None = None,
+    ) -> tuple[dict[str, str], ...]:
+        parameters: list[object] = []
+        course_clause = ""
+        if course_name is not None:
+            course_clause = "AND courses.name = ?"
+            parameters.append(course_name)
+        rows = self.connection.execute(
+            f"""
+            SELECT
+                courses.name AS course,
+                source_files.relative_path AS source_file,
+                source_files.source_path,
+                source_files.error_message
+            FROM source_files
+            JOIN courses ON courses.id = source_files.course_id
+            WHERE source_files.status = 'failed'
+            {course_clause}
+            ORDER BY courses.name, source_files.relative_path
+            """,
+            parameters,
+        ).fetchall()
+        return tuple(
+            {
+                "type": "source_failed",
+                "course": str(row["course"]),
+                "source_file": str(row["source_file"]),
+                "source_path": str(row["source_path"]),
+                "message": str(row["error_message"] or "source refresh failed"),
+            }
+            for row in rows
+        )
 
 
 def remove_course_data(
@@ -315,18 +584,38 @@ def remove_course_data(
         """,
         (course_name,),
     ).fetchall()
-    render_root = (data_root() / "renders").resolve()
     render_directories: set[Path] = set()
     for row in rows:
         render_path = Path(row["render_path"]).expanduser().resolve()
-        if not render_path.is_relative_to(render_root):
-            raise ValueError(
-                f"refusing to delete generated path outside ClassCorpus data directory: "
-                f"{render_path}"
-            )
-        render_directories.add(render_path.parent)
+        render_directories.add(_validated_render_directory(render_path.parent))
 
-    for directory in sorted(render_directories, key=lambda path: len(path.parts), reverse=True):
-        if directory.exists():
-            shutil.rmtree(directory)
-    return database.remove_course(course_name)
+    other_references = {
+        Path(row["render_path"]).expanduser().resolve().parent
+        for row in database.connection.execute(
+            """
+            SELECT slides.render_path
+            FROM slides
+            JOIN source_files ON source_files.id = slides.source_file_id
+            JOIN courses ON courses.id = source_files.course_id
+            WHERE courses.name != ? AND slides.render_path IS NOT NULL
+            """,
+            (course_name,),
+        )
+    }
+    removed = database.schedule_course_removal(
+        course_name,
+        render_directories - other_references,
+    )
+    cleaned = database.cleanup_pending_deletions()
+    return removed or cleaned > 0
+
+
+def _validated_render_directory(directory: Path) -> Path:
+    render_root = (data_root() / "renders").resolve()
+    resolved = directory.expanduser().resolve()
+    if resolved == render_root or not resolved.is_relative_to(render_root):
+        raise ValueError(
+            "refusing to delete generated path outside ClassCorpus data directory: "
+            f"{resolved}"
+        )
+    return resolved

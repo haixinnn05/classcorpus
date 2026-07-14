@@ -93,6 +93,8 @@ def semantic_ranking(
     encoder: Encoder,
     *,
     course: str | None = None,
+    source_file: str | None = None,
+    ordinal: int | None = None,
 ) -> list[int]:
     encoded = list(encoder.encode([query]))
     if len(encoded) != 1:
@@ -100,10 +102,17 @@ def semantic_ranking(
     query_vector = _normalize(encoded[0])
 
     parameters: list[object] = [encoder.model_name]
-    course_clause = ""
+    filter_clauses: list[str] = []
     if course is not None:
-        course_clause = "AND courses.name = ?"
+        filter_clauses.append("courses.name = ?")
         parameters.append(course)
+    if source_file is not None:
+        filter_clauses.append("source_files.relative_path = ?")
+        parameters.append(source_file)
+    if ordinal is not None:
+        filter_clauses.append("slides.ordinal = ?")
+        parameters.append(ordinal)
+    filter_sql = "".join(f" AND {clause}" for clause in filter_clauses)
     rows = database.connection.execute(
         f"""
         SELECT slide_embeddings.slide_id, slide_embeddings.dimension,
@@ -113,7 +122,7 @@ def semantic_ranking(
         JOIN source_files ON source_files.id = slides.source_file_id
         JOIN courses ON courses.id = source_files.course_id
         WHERE slide_embeddings.model_name = ?
-        {course_clause}
+        {filter_sql}
         """,
         parameters,
     ).fetchall()

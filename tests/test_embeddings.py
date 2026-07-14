@@ -54,6 +54,30 @@ def test_hybrid_search_uses_stored_vectors(indexed_course: Database):
     assert results[0].title == "Dynamic Programming"
 
 
+def test_hybrid_search_honors_source_and_ordinal_filters(indexed_course: Database):
+    build_embeddings(indexed_course, "Algorithms", FakeEncoder())
+
+    results = search(
+        indexed_course,
+        "cached recursion",
+        course="Algorithms",
+        source_file="Lecture08.pptx",
+        ordinal=1,
+        encoder=FakeEncoder(),
+    )
+
+    assert [(result.source_file, result.ordinal) for result in results] == [
+        ("Lecture08.pptx", 1)
+    ]
+    assert search(
+        indexed_course,
+        "cached recursion",
+        course="Algorithms",
+        source_file="missing.pptx",
+        encoder=FakeEncoder(),
+    ) == []
+
+
 def test_rank_fusion_rewards_results_in_both_rankings():
     scores = reciprocal_rank_fusion([[1, 2], [2, 3]])
     assert scores[2] > scores[1]

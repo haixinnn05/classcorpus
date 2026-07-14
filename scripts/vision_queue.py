@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 from dataclasses import asdict
 
-from _common import emit, fail
+from _common import argument_parser, emit, fail
 from classcorpus.database import Database
 from classcorpus.vision import get_vision_queue
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="List slides awaiting visual analysis.")
+    parser = argument_parser(description="List slides awaiting visual analysis.")
     parser.add_argument("course")
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--json", action="store_true", dest="json_mode")

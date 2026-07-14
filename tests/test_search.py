@@ -43,9 +43,55 @@ def test_search_finds_speaker_notes_and_table_text(indexed_course: Database):
     assert table[0].ordinal == 2
 
 
+def test_search_filters_by_source_file_and_ordinal(indexed_course: Database):
+    results = search(
+        indexed_course,
+        "dynamic programming Fibonacci",
+        course="Algorithms",
+        source_file="Lecture08.pptx",
+        ordinal=2,
+    )
+
+    assert [(result.source_file, result.ordinal) for result in results] == [
+        ("Lecture08.pptx", 2)
+    ]
+    assert search(
+        indexed_course,
+        "Bellman-Ford",
+        course="Algorithms",
+        source_file="Lecture08.pptx",
+    ) == []
+
+
 def test_search_rejects_blank_query(indexed_course: Database):
     with pytest.raises(ValueError, match="query must not be blank"):
         search(indexed_course, "   ")
+
+
+def test_search_rejects_non_positive_ordinal(indexed_course: Database):
+    with pytest.raises(ValueError, match="ordinal must be at least 1"):
+        search(indexed_course, "memoization", ordinal=0)
+
+
+def test_failed_refresh_marks_retained_results_as_stale(indexed_course: Database):
+    row = indexed_course.connection.execute(
+        """
+        SELECT source_path FROM source_files
+        WHERE relative_path = 'handout.pdf'
+        """
+    ).fetchone()
+    Path(row["source_path"]).write_bytes(b"not a pdf")
+    report = sync_course(
+        indexed_course,
+        "Algorithms",
+        Path(row["source_path"]).parent,
+    )
+
+    results = search(indexed_course, "negative edges", course="Algorithms")
+
+    assert report.failed == 1
+    assert results[0].source_status == "failed"
+    assert results[0].source_error
 
 
 def test_citation_uses_slide_or_page():
@@ -54,6 +100,8 @@ def test_citation_uses_slide_or_page():
         course="Algorithms",
         source_file="Lecture08.pptx",
         source_path="/courses/Algorithms/Lecture08.pptx",
+        source_status="ready",
+        source_error=None,
         ordinal=27,
         kind="slide",
         title="Dynamic Programming",
@@ -70,6 +118,8 @@ def test_citation_uses_slide_or_page():
         course="Algorithms",
         source_file="handout.pdf",
         source_path="/courses/Algorithms/handout.pdf",
+        source_status="ready",
+        source_error=None,
         ordinal=3,
         kind="page",
         title="Shortest Paths",

@@ -20,6 +20,7 @@ ClassCorpus provides:
 - One-based slide/page records and exact source paths
 - Incremental SHA-256 synchronization
 - Atomic replacement that preserves valid records after parse failures
+- Explicit stale-source warnings when a refresh fails
 - SQLite FTS5 retrieval with optional local embeddings
 - Opt-in, agent-native visual slide descriptions
 - Cited summaries, comparisons, flashcards, exams, cheat sheets, and plans
@@ -77,6 +78,14 @@ The agent searches the local index before answering:
   "Bellman-Ford" --course "Algorithms" --json
 ```
 
+Limit retrieval to one lecture and slide/page when needed:
+
+```bash
+.venv/bin/python scripts/search_lectures.py \
+  "memoization" --course "Algorithms" \
+  --source "Lecture08.pptx" --ordinal 27 --json
+```
+
 Expected citations look like:
 
 ```text
@@ -106,6 +115,8 @@ Full-text search works immediately. To add a local sentence-transformer:
 ```bash
 .venv/bin/python -m pip install -e ".[embeddings]"
 .venv/bin/python scripts/build_embeddings.py "Algorithms" --json
+.venv/bin/python scripts/search_lectures.py \
+  "cached recursion" --course "Algorithms" --semantic --json
 ```
 
 This may download model weights. It is never required for baseline use.
@@ -120,6 +131,9 @@ Removal requires explicit confirmation:
 
 This deletes only ClassCorpus database rows and rendered cache files. It never
 modifies lecture sources.
+
+If a refresh fails, ClassCorpus keeps the last valid extracted records but
+marks them as stale in search JSON until synchronization succeeds.
 
 ## Privacy
 

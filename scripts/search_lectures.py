@@ -1,36 +1,89 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 from dataclasses import asdict
 
-from _common import emit, fail
+from _common import argument_parser, emit, fail
+from _embeddings import SentenceTransformerEncoder
 from classcorpus.citations import format_citation
 from classcorpus.database import Database
 from classcorpus.search import search
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Search indexed course materials.")
+    parser = argument_parser(description="Search indexed course materials.")
     parser.add_argument("query")
     parser.add_argument("--course")
+    parser.add_argument("--source")
+    parser.add_argument("--ordinal", type=int)
     parser.add_argument("--limit", type=int, default=8)
+    parser.add_argument("--semantic", action="store_true")
+    parser.add_argument(
+        "--model",
+        default="sentence-transformers/all-MiniLM-L6-v2",
+    )
     parser.add_argument("--json", action="store_true", dest="json_mode")
     args = parser.parse_args()
     try:
         database = Database()
         database.initialize()
+        encoder = (
+            SentenceTransformerEncoder(args.model)
+            if args.semantic
+            else None
+        )
         results = search(
             database,
             args.query,
             course=args.course,
+            source_file=args.source,
+            ordinal=args.ordinal,
             limit=args.limit,
+            encoder=encoder,
         )
         payload = [
             {**asdict(result), "citation": format_citation(result)}
             for result in results
         ]
-        emit({"ok": True, "results": payload}, json_mode=args.json_mode)
+        health = database.source_health(args.course)
+        source_warnings = list(database.source_failures(args.course))
+        sync_required = health.total == 0 or health.failed > 0
+        response = {
+            "ok": True,
+            "results": payload,
+            "sync_required": sync_required,
+            "warnings": source_warnings,
+        }
+        if not payload:
+            if health.total == 0:
+                response["message"] = (
+                    "No indexed course evidence is available. Synchronize the "
+                    "course with index_lectures.py."
+                )
+            elif health.failed > 0:
+                response["message"] = (
+                    "No evidence matched and one or more sources failed their "
+                    "latest refresh. Synchronize the course and inspect warnings."
+                )
+            else:
+                response["message"] = (
+                    "No indexed evidence matched. Search with alternative terms "
+                    "or adjust the source and ordinal filters."
+                )
+        elif health.failed > 0:
+            if any(result.source_status == "failed" for result in results):
+                response["message"] = (
+                    "Some returned results come from sources whose latest refresh "
+                    "failed. Synchronize the course and inspect warnings before "
+                    "relying on them."
+                )
+            else:
+                response["message"] = (
+                    "Other indexed sources failed their latest refresh; returned "
+                    "results are from ready sources. Synchronize the course and "
+                    "inspect warnings for missing coverage."
+                )
+        emit(response, json_mode=args.json_mode)
         return 0
     except Exception as error:
         return fail(error, json_mode=args.json_mode)

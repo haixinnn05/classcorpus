@@ -42,6 +42,14 @@ If `python` is unavailable, use the environment's Python 3 executable.
    terms when results are weak, incomplete, or conflicting. Never load every
    source file merely to answer one question.
 
+   For a specific lecture or slide/page, add `--source "RELATIVE/PATH.pptx"`
+   and/or `--ordinal NUMBER`.
+
+   If `sync_required` is true, synchronize the course with
+   `index_lectures.py` or ask the user for its source folder before answering.
+   Treat any result with `source_status: "failed"` as retained stale evidence:
+   disclose the warning and do not present it as freshly verified.
+
 4. Cite every course-derived factual claim with the returned `citation`.
    Follow [references/citation-rules.md](references/citation-rules.md).
 
@@ -95,7 +103,15 @@ chooses local semantic search and the optional dependencies are installed, run:
 python "$SKILL_DIR/scripts/build_embeddings.py" "COURSE" --json
 ```
 
-Do not require embeddings for normal indexing or search.
+Then opt into hybrid retrieval:
+
+```text
+python "$SKILL_DIR/scripts/search_lectures.py" \
+  "QUERY" --course "COURSE" --semantic --json
+```
+
+Use the same `--model` value for building and searching when overriding the
+default. Do not require embeddings for normal indexing or search.
 
 ## Study Requests
 

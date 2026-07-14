@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -30,3 +31,24 @@ def fail(error: Exception, *, json_mode: bool) -> int:
         json_mode=json_mode,
     )
     return 1
+
+
+class AgentArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        if "--json" in sys.argv[1:]:
+            emit(
+                {
+                    "ok": False,
+                    "error": {
+                        "type": "ArgumentError",
+                        "message": message,
+                    },
+                },
+                json_mode=True,
+            )
+            raise SystemExit(1)
+        super().error(message)
+
+
+def argument_parser(*, description: str) -> AgentArgumentParser:
+    return AgentArgumentParser(description=description)

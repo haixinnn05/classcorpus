@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
-
-from _common import emit, fail
+from _common import argument_parser, emit, fail
 from classcorpus.database import Database, remove_course_data
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
+    parser = argument_parser(
         description="Delete one course's generated ClassCorpus data."
     )
     parser.add_argument("course")
