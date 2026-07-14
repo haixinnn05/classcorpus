@@ -1,41 +1,124 @@
 ---
 name: classcorpus
-description: Use this skill to index or search local lecture folders containing PDF or PowerPoint files and answer with exact citations.
+description: Index and search local PDF and PowerPoint lecture folders as a persistent, citation-aware course memory. Use when a user wants to add or refresh course materials, answer questions from class, compare concepts across lectures, create cited summaries, flashcards, practice exams, cheat sheets, or study plans, or analyze visual slide content with Codex, Claude Code, or another Agent Skills-compatible assistant.
 ---
 
 # ClassCorpus
 
-## Overview
+Use ClassCorpus as a local evidence layer for the active agent. Keep reasoning
+and generation in the host agent; invoke the bundled scripts only for
+deterministic indexing, retrieval, optional embeddings, and visual-description
+storage.
 
-ClassCorpus gives an agent a local, reusable index of course materials instead
-of rereading lecture files for every request.
+## Resolve The Skill Directory
 
-Use it when the user wants to sync a lecture folder, search indexed course
-content, or answer study questions with slide- or page-level citations.
+Treat the directory containing this `SKILL.md` as `SKILL_DIR`. Run every script
+by absolute path so the workflow does not depend on the current directory:
 
-## Core Workflow
+```text
+python "$SKILL_DIR/scripts/<script>.py" ...
+```
 
-1. Index or refresh a local course directory that contains `.pdf` or `.pptx`
-   lecture materials.
-2. Search the local index before answering course-specific questions.
-3. Return the smallest relevant set of cited records instead of loading an
-   entire semester into context.
-4. Keep generated data in the local ClassCorpus data directory and never modify
-   source lecture files.
+If `python` is unavailable, use the environment's Python 3 executable.
 
-## When To Use
+## Mandatory Workflow
 
-- The user wants to register or refresh a course folder on disk.
-- The user asks about content that should be grounded in lecture PDFs or
-  PowerPoint decks.
-- The user wants cited summaries, comparisons, flashcards, or study materials
-  derived from indexed lectures.
-- The user wants visual slide analysis to remain local and agent-native.
+1. Synchronize a course when it is new or the user says files changed:
 
-## Guardrails
+   ```text
+   python "$SKILL_DIR/scripts/index_lectures.py" \
+     "COURSE" "/absolute/path/to/course" --json
+   ```
+
+2. Do not answer a course-specific claim before searching. Retrieve a small
+   candidate set:
+
+   ```text
+   python "$SKILL_DIR/scripts/search_lectures.py" \
+     "QUERY" --course "COURSE" --limit 8 --json
+   ```
+
+3. Inspect the returned evidence. Search again with narrower or alternative
+   terms when results are weak, incomplete, or conflicting. Never load every
+   source file merely to answer one question.
+
+4. Cite every course-derived factual claim with the returned `citation`.
+   Follow [references/citation-rules.md](references/citation-rules.md).
+
+5. Label information from general knowledge explicitly as outside the indexed
+   course materials. Do not blend it silently into course-grounded claims.
+
+6. Generate a requested artifact only after retrieving coverage for the full
+   requested lecture range. Follow
+   [references/study-workflows.md](references/study-workflows.md).
+
+Read [references/record-schema.md](references/record-schema.md) when consuming
+or producing script JSON.
+
+## Visual Analysis
+
+Ask for confirmation before visual analysis because rendered slide images will
+be viewed by the active agent under that agent's data policy.
+
+After confirmation:
+
+1. Request a small resumable batch:
+
+   ```text
+   python "$SKILL_DIR/scripts/vision_queue.py" \
+     "COURSE" --limit 5 --json
+   ```
+
+2. View each returned image. Describe diagrams, charts, equations, handwritten
+   annotations, labels, arrows, spatial relationships, and conclusions. Do not
+   merely transcribe visible text.
+
+3. Write a JSON document matching `references/record-schema.md`.
+
+4. Store the descriptions:
+
+   ```text
+   python "$SKILL_DIR/scripts/store_visual_description.py" \
+     --input "/absolute/path/to/descriptions.json" --json
+   ```
+
+5. Repeat only when the user requested broader visual coverage.
+
+Never claim an unrendered or undescribed visual detail was inspected.
+
+## Optional Semantic Search
+
+Baseline SQLite full-text search requires no model download. Only when the user
+chooses local semantic search and the optional dependencies are installed, run:
+
+```text
+python "$SKILL_DIR/scripts/build_embeddings.py" "COURSE" --json
+```
+
+Do not require embeddings for normal indexing or search.
+
+## Study Requests
+
+Support these evidence-grounded workflows:
+
+- Cited question answering and simpler explanations
+- Lecture summary and multi-lecture summary
+- Cross-lecture comparison
+- Flashcards and Anki-compatible data
+- Practice exam with answer key
+- Cheat sheet
+- Study plan
+
+Retrieve first, preserve citations, and state any missing lecture coverage.
+
+## Boundaries
 
 - Never modify or delete lecture source files.
-- Prefer exact citations over uncited summaries.
-- Keep generated data outside lecture folders and respect
-  `CLASSCORPUS_DATA_DIR` when it is set.
-- Treat visual analysis as opt-in work performed by the active agent.
+- Never expose indexed content through telemetry or a network service.
+- Do not create a web server.
+- Do not create a custom chatbot.
+- Do not create a hosted backend.
+- Do not call model-provider APIs from the scripts.
+- Keep generated data outside lecture folders.
+- Treat confidential or restricted materials according to the active agent's
+  data policy; when clearance is uncertain, ask before processing.

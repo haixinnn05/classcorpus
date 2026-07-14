@@ -1,4 +1,4 @@
 interface:
   display_name: "ClassCorpus"
-  short_description: "Search local lecture folders with exact citations"
-  default_prompt: "Use ClassCorpus to index or search my local course materials."
+  short_description: "Search local lectures with exact citations"
+  default_prompt: "Use ClassCorpus to answer from my indexed course materials."
