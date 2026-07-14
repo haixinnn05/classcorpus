@@ -193,6 +193,75 @@ def test_initialize_migrates_legacy_slides_for_review(tmp_path):
     assert row["native_text_chars"] == len(row["raw_text"])
 
 
+def test_initialize_preserves_evidence_during_partial_migration(tmp_path):
+    raw = "Title\n\n  exact raw body"
+    db = Database(tmp_path / "db.sqlite3")
+
+    with db.connection:
+        db.connection.executescript(
+            """
+            CREATE TABLE slides (
+                id INTEGER PRIMARY KEY,
+                source_file_id INTEGER NOT NULL,
+                ordinal INTEGER NOT NULL CHECK(ordinal >= 1),
+                kind TEXT NOT NULL CHECK(kind IN ('slide', 'page')),
+                title TEXT NOT NULL,
+                body_text TEXT NOT NULL,
+                speaker_notes TEXT NOT NULL,
+                raw_text TEXT NOT NULL DEFAULT '',
+                extraction_status TEXT NOT NULL DEFAULT 'review-needed',
+                extraction_reasons TEXT NOT NULL DEFAULT '[]',
+                visual_description TEXT,
+                render_path TEXT,
+                vision_status TEXT NOT NULL DEFAULT 'pending',
+                UNIQUE(source_file_id, ordinal)
+            );
+            """
+        )
+        db.connection.execute(
+            """
+            INSERT INTO slides(
+                source_file_id,
+                ordinal,
+                kind,
+                title,
+                body_text,
+                speaker_notes,
+                raw_text,
+                extraction_status,
+                extraction_reasons,
+                visual_description,
+                render_path,
+                vision_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                1,
+                1,
+                "page",
+                "Title",
+                "normalized body",
+                "",
+                raw,
+                "text-extracted",
+                '["native-text"]',
+                None,
+                None,
+                "pending",
+            ),
+        )
+
+    db.initialize()
+
+    row = db.connection.execute("SELECT * FROM slides").fetchone()
+    assert row is not None
+    assert row["raw_text"] == raw
+    assert row["extraction_status"] == "text-extracted"
+    assert json.loads(row["extraction_reasons"]) == ["native-text"]
+    assert row["native_text_chars"] == len(raw)
+    assert row["has_visual_content"] == 0
+
+
 def test_remove_course_cleans_up_relational_and_fts_rows(tmp_path):
     db = Database(tmp_path / "db.sqlite3")
     db.initialize()

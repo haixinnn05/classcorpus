@@ -527,14 +527,14 @@ class Database:
             "native_text_chars": "INTEGER NOT NULL DEFAULT 0",
             "has_visual_content": "INTEGER NOT NULL DEFAULT 0",
         }
-        added = False
+        added_columns: set[str] = set()
         for name, declaration in additions.items():
             if name not in columns:
                 self.connection.execute(
                     f"ALTER TABLE slides ADD COLUMN {name} {declaration}"
                 )
-                added = True
-        if added:
+                added_columns.add(name)
+        if "raw_text" in added_columns:
             self.connection.execute(
                 """
                 UPDATE slides
@@ -542,11 +542,10 @@ class Database:
                         WHEN body_text = '' THEN title
                         WHEN title = '' THEN body_text
                         ELSE title || char(10) || body_text
-                    END,
-                    extraction_status = 'review-needed',
-                    extraction_reasons = '["legacy-record-not-audited"]'
+                    END
                 """
             )
+        if "native_text_chars" in added_columns:
             self.connection.execute(
                 "UPDATE slides SET native_text_chars = length(raw_text)"
             )
