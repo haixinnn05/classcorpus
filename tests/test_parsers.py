@@ -2,6 +2,7 @@ from pathlib import Path
 import shutil
 
 import pytest
+from pptx import Presentation
 
 from classcorpus.parsers import UnsupportedFormatError, parse_source
 from tests.fixtures.make_fixtures import make_pdf_fixture, make_pptx_fixture
@@ -20,10 +21,22 @@ def pptx_fixture(tmp_path: Path) -> Path:
 def test_pdf_preserves_pages_and_renders(pdf_fixture: Path, tmp_path: Path):
     records = parse_source(pdf_fixture, tmp_path / "renders")
 
-    assert [(r.kind, r.ordinal) for r in records] == [("page", 1), ("page", 2)]
-    assert records[0].title == "Shortest Paths"
-    assert "Bellman-Ford" in records[1].body_text
+    with pytest.importorskip("fitz").open(pdf_fixture) as document:
+        assert len(records) == document.page_count
+        assert [record.ordinal for record in records] == list(
+            range(1, document.page_count + 1)
+        )
+
+    assert records[0].raw_text.endswith("precise-content")
+    assert len(records[0].raw_text) > 100_000
+    assert records[0].title == "Long lecture"
     assert records[0].speaker_notes == ""
+    assert records[0].native_text_chars == len(records[0].raw_text)
+    assert records[0].extraction_status == "text-extracted"
+    assert records[1].extraction_status == "review-needed"
+    assert "low-native-text" in records[1].extraction_reasons
+    assert "embedded-image" in records[1].extraction_reasons
+    assert records[1].has_visual_content is True
     assert Path(records[0].render_path).is_file()
     assert Path(records[1].render_path).is_file()
 
@@ -33,11 +46,17 @@ def test_pptx_preserves_slides_text_tables_notes_and_best_effort_renders(
 ):
     records = parse_source(pptx_fixture, tmp_path / "renders")
 
-    assert [(r.kind, r.ordinal) for r in records] == [
-        ("slide", 1),
-        ("slide", 2),
-    ]
+    assert len(records) == len(Presentation(pptx_fixture).slides)
+    assert [record.ordinal for record in records] == list(range(1, len(records) + 1))
     assert records[0].title == "Recurrences"
+    assert "Nested group detail." in records[0].body_text
+    assert records[0].raw_text.count("OOXML fallback detail") == 1
+    assert "OOXML fallback detail" in records[0].body_text
+    assert "unmapped-ooxml-text" in records[0].extraction_reasons
+    assert records[0].extraction_status == "review-needed"
+    assert records[0].speaker_notes == "Exact instructor note."
+    assert records[0].native_text_chars == len(records[0].raw_text)
+    assert records[0].has_visual_content is True
     assert records[1].title == "Dynamic Programming"
     assert "Memoization avoids repeated subproblems." in records[1].body_text
     assert "Fibonacci" in records[1].body_text

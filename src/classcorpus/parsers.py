@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+import re
 import shutil
 import subprocess
 import tempfile
@@ -9,7 +11,7 @@ import fitz
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-from classcorpus.models import SlideRecord
+from classcorpus.models import ExtractionStatus, SlideRecord
 
 
 class UnsupportedFormatError(ValueError):
@@ -33,8 +35,10 @@ def _parse_pdf(path: Path, render_dir: Path) -> list[SlideRecord]:
     records: list[SlideRecord] = []
     with fitz.open(path) as document:
         for ordinal, page in enumerate(document, start=1):
-            page_text = _normalized_text(page.get_text("text"))
+            raw_text = page.get_text("text", sort=True)
+            page_text = _normalized_text(raw_text)
             title, body_text = _split_title_and_body(page_text)
+            has_visual_content, extraction_reasons = _pdf_audit(page, raw_text)
 
             image_path = render_dir / f"page-{ordinal:04d}.png"
             page.get_pixmap(
@@ -49,6 +53,11 @@ def _parse_pdf(path: Path, render_dir: Path) -> list[SlideRecord]:
                     title=title,
                     body_text=body_text,
                     speaker_notes="",
+                    raw_text=raw_text,
+                    extraction_status=_status(extraction_reasons),
+                    extraction_reasons=extraction_reasons,
+                    native_text_chars=len(raw_text),
+                    has_visual_content=has_visual_content,
                     render_path=str(image_path),
                 )
             )
@@ -64,12 +73,21 @@ def _parse_pptx(path: Path, render_dir: Path) -> list[SlideRecord]:
     for ordinal, slide in enumerate(presentation.slides, start=1):
         text_frames: list[str] = []
         table_texts: list[str] = []
+        extracted_texts: list[str] = []
 
         for shape in slide.shapes:
-            _collect_shape_text(shape, text_frames, table_texts)
+            _collect_shape_text(shape, text_frames, table_texts, extracted_texts)
 
         title = text_frames[0] if text_frames else ""
         body_parts = text_frames[1:] + table_texts
+        census = _xml_texts(slide.element)
+        missing_texts = list(dict.fromkeys(_missing_texts(census, extracted_texts)))
+        body_parts.extend(missing_texts)
+        raw_text = "\n".join(census)
+        has_visual_content, extraction_reasons = _pptx_audit(
+            slide,
+            missing_texts,
+        )
 
         notes_text = ""
         try:
@@ -84,6 +102,11 @@ def _parse_pptx(path: Path, render_dir: Path) -> list[SlideRecord]:
                 title=title,
                 body_text="\n".join(body_parts),
                 speaker_notes=notes_text,
+                raw_text=raw_text,
+                extraction_status=_status(extraction_reasons),
+                extraction_reasons=extraction_reasons,
+                native_text_chars=len(raw_text),
+                has_visual_content=has_visual_content,
                 render_path=rendered_paths[ordinal - 1],
             )
         )
@@ -95,26 +118,163 @@ def _collect_shape_text(
     shape,
     text_frames: list[str],
     table_texts: list[str],
+    extracted_texts: list[str],
 ) -> None:
     if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
         for child in shape.shapes:
-            _collect_shape_text(child, text_frames, table_texts)
+            _collect_shape_text(child, text_frames, table_texts, extracted_texts)
         return
 
     if getattr(shape, "has_text_frame", False):
         text = _normalized_text(shape.text_frame.text)
         if text:
             text_frames.append(text)
+        extracted_texts.extend(_text_frame_texts(shape.text_frame))
 
     if getattr(shape, "has_table", False):
-        cell_text: list[str] = []
         for row in shape.table.rows:
             for cell in row.cells:
                 text = _normalized_text(cell.text)
                 if text:
-                    cell_text.append(text)
-        if cell_text:
-            table_texts.append("\n".join(cell_text))
+                    table_texts.append(text)
+                extracted_texts.extend(_text_frame_texts(cell.text_frame))
+
+
+def _text_frame_texts(text_frame) -> list[str]:
+    texts: list[str] = []
+    for paragraph in text_frame.paragraphs:
+        run_texts = [run.text for run in paragraph.runs if run.text]
+        if run_texts:
+            texts.extend(run_texts)
+        elif paragraph.text:
+            texts.append(paragraph.text)
+    return texts
+
+
+def _tokens(text: str) -> Counter[str]:
+    return Counter(re.findall(r"\w+", text.casefold(), flags=re.UNICODE))
+
+
+def _pdf_audit(page: fitz.Page, raw_text: str) -> tuple[bool, tuple[str, ...]]:
+    reasons: list[str] = []
+    images = bool(page.get_images(full=True))
+    drawings = bool(page.get_drawings())
+    word_text = " ".join(str(word[4]) for word in page.get_text("words"))
+    block_text = "\n".join(
+        str(block[4]) for block in page.get_text("blocks") if len(block) > 4
+    )
+    native_tokens = _tokens(raw_text)
+    if _tokens(word_text) - native_tokens or _tokens(block_text) - native_tokens:
+        reasons.append("native-extractor-disagreement")
+    if not raw_text.strip():
+        reasons.append("no-native-text")
+    elif images and len(raw_text.strip()) < 80:
+        reasons.append("low-native-text")
+        reasons.append("embedded-image")
+    return images or drawings, tuple(dict.fromkeys(reasons))
+
+
+def _xml_texts(element) -> list[str]:
+    return [
+        node.text
+        for node in element.iter()
+        if node.tag.endswith("}t") and node.text
+    ]
+
+
+def _missing_texts(census: list[str], extracted: list[str]) -> list[str]:
+    remaining = Counter(text.strip() for text in extracted if text.strip())
+    missing: list[str] = []
+    for text in (item.strip() for item in census):
+        if not text:
+            continue
+        if remaining[text]:
+            remaining[text] -= 1
+        else:
+            missing.append(text)
+    return missing
+
+
+def _pptx_audit(slide, missing_texts: list[str]) -> tuple[bool, tuple[str, ...]]:
+    shape_types = set(_shape_types(slide.shapes))
+    local_tags = {
+        node.tag.rsplit("}", 1)[-1].casefold() for node in slide.element.iter()
+    }
+    relationship_suffixes = {
+        relationship.reltype.rsplit("/", 1)[-1].casefold()
+        for relationship in slide.part.rels.values()
+    }
+
+    has_image = (
+        bool(
+            shape_types
+            & {
+                MSO_SHAPE_TYPE.PICTURE,
+                MSO_SHAPE_TYPE.LINKED_PICTURE,
+            }
+        )
+        or "pic" in local_tags
+        or "image" in relationship_suffixes
+    )
+    has_chart_or_diagram = (
+        bool(
+            shape_types
+            & {
+                MSO_SHAPE_TYPE.CHART,
+                MSO_SHAPE_TYPE.DIAGRAM,
+                MSO_SHAPE_TYPE.IGX_GRAPHIC,
+            }
+        )
+        or "chart" in local_tags
+        or bool(
+            relationship_suffixes
+            & {
+                "chart",
+                "diagramdata",
+                "diagramlayout",
+                "diagramcolors",
+                "diagramquickstyle",
+            }
+        )
+    )
+    has_equation_or_object = (
+        bool(
+            shape_types
+            & {
+                MSO_SHAPE_TYPE.EMBEDDED_OLE_OBJECT,
+                MSO_SHAPE_TYPE.LINKED_OLE_OBJECT,
+                MSO_SHAPE_TYPE.OLE_CONTROL_OBJECT,
+            }
+        )
+        or bool(local_tags & {"omath", "oleobj"})
+        or bool(relationship_suffixes & {"oleobject", "package"})
+    )
+
+    reasons: list[str] = []
+    if missing_texts:
+        reasons.append("unmapped-ooxml-text")
+    if has_image:
+        reasons.append("embedded-image")
+    if has_chart_or_diagram:
+        reasons.append("chart-or-diagram")
+    if has_equation_or_object:
+        reasons.append("equation-or-embedded-object")
+
+    return (
+        has_image or has_chart_or_diagram or has_equation_or_object,
+        tuple(reasons),
+    )
+
+
+def _shape_types(shapes):
+    for shape in shapes:
+        yield shape.shape_type
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            yield from _shape_types(shape.shapes)
+
+
+def _status(reasons: tuple[str, ...]) -> ExtractionStatus:
+    return "review-needed" if reasons else "text-extracted"
 
 
 def _render_pptx_to_images(
