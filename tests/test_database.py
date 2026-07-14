@@ -44,6 +44,98 @@ def test_schema_enables_fts(tmp_path):
     assert "slide_fts" in names
 
 
+def test_remove_course_cleans_up_relational_and_fts_rows(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+    db.initialize()
+
+    course = db.upsert_course("Algorithms", tmp_path / "lectures")
+
+    with db.connection:
+        cursor = db.connection.execute(
+            """
+            INSERT INTO source_files(
+                course_id,
+                relative_path,
+                source_path,
+                size,
+                mtime_ns,
+                sha256,
+                parser_version,
+                status,
+                error_message
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                course.id,
+                "week-1/lecture-1.pdf",
+                str((tmp_path / "lectures" / "week-1" / "lecture-1.pdf").resolve()),
+                123,
+                456,
+                "abc",
+                "1",
+                "ready",
+                None,
+            ),
+        )
+        source_file_id = cursor.lastrowid
+        slide_id = db.connection.execute(
+            """
+            INSERT INTO slides(
+                source_file_id,
+                ordinal,
+                kind,
+                title,
+                body_text,
+                speaker_notes,
+                visual_description,
+                render_path,
+                vision_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                source_file_id,
+                1,
+                "page",
+                "Shortest Paths",
+                "Bellman-Ford handles negative edges.",
+                "",
+                None,
+                None,
+                "pending",
+            ),
+        ).lastrowid
+        db.connection.execute(
+            """
+            INSERT INTO slide_fts(
+                slide_id,
+                title,
+                body_text,
+                speaker_notes,
+                visual_description
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                slide_id,
+                "Shortest Paths",
+                "Bellman-Ford handles negative edges.",
+                "",
+                None,
+            ),
+        )
+
+    assert db.connection.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 1
+    assert db.connection.execute("SELECT COUNT(*) FROM source_files").fetchone()[0] == 1
+    assert db.connection.execute("SELECT COUNT(*) FROM slides").fetchone()[0] == 1
+    assert db.connection.execute("SELECT COUNT(*) FROM slide_fts").fetchone()[0] == 1
+
+    assert db.remove_course("Algorithms") is True
+
+    assert db.connection.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 0
+    assert db.connection.execute("SELECT COUNT(*) FROM source_files").fetchone()[0] == 0
+    assert db.connection.execute("SELECT COUNT(*) FROM slides").fetchone()[0] == 0
+    assert db.connection.execute("SELECT COUNT(*) FROM slide_fts").fetchone()[0] == 0
+
+
 def test_schema_enforces_required_uniqueness_and_cascade(tmp_path):
     db = Database(tmp_path / "db.sqlite3")
     db.initialize()
@@ -168,3 +260,68 @@ def test_schema_enforces_required_uniqueness_and_cascade(tmp_path):
         db.connection.execute("SELECT COUNT(*) FROM source_files").fetchone()[0] == 0
     )
     assert db.connection.execute("SELECT COUNT(*) FROM slides").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("ordinal", [0, -1])
+def test_schema_rejects_non_positive_ordinals(tmp_path, ordinal):
+    db = Database(tmp_path / "db.sqlite3")
+    db.initialize()
+
+    course = db.upsert_course("Algorithms", tmp_path / "lectures")
+
+    with db.connection:
+        source_file_id = db.connection.execute(
+            """
+            INSERT INTO source_files(
+                course_id,
+                relative_path,
+                source_path,
+                size,
+                mtime_ns,
+                sha256,
+                parser_version,
+                status,
+                error_message
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                course.id,
+                "week-1/lecture-1.pdf",
+                str((tmp_path / "lectures" / "week-1" / "lecture-1.pdf").resolve()),
+                123,
+                456,
+                "abc",
+                "1",
+                "ready",
+                None,
+            ),
+        ).lastrowid
+
+    with pytest.raises(sqlite3.IntegrityError):
+        with db.connection:
+            db.connection.execute(
+                """
+                INSERT INTO slides(
+                    source_file_id,
+                    ordinal,
+                    kind,
+                    title,
+                    body_text,
+                    speaker_notes,
+                    visual_description,
+                    render_path,
+                    vision_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    source_file_id,
+                    ordinal,
+                    "page",
+                    "Shortest Paths",
+                    "Bellman-Ford handles negative edges.",
+                    "",
+                    None,
+                    None,
+                    "pending",
+                ),
+            )

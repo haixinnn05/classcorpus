@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS source_files (
 CREATE TABLE IF NOT EXISTS slides (
     id INTEGER PRIMARY KEY,
     source_file_id INTEGER NOT NULL REFERENCES source_files(id) ON DELETE CASCADE,
-    ordinal INTEGER NOT NULL,
+    ordinal INTEGER NOT NULL CHECK(ordinal >= 1),
     kind TEXT NOT NULL CHECK(kind IN ('slide', 'page')),
     title TEXT NOT NULL,
     body_text TEXT NOT NULL,
@@ -89,6 +89,19 @@ class Database:
 
     def remove_course(self, name: str) -> bool:
         with self.connection:
+            self.connection.execute(
+                """
+                DELETE FROM slide_fts
+                WHERE slide_id IN (
+                    SELECT slides.id
+                    FROM slides
+                    JOIN source_files ON source_files.id = slides.source_file_id
+                    JOIN courses ON courses.id = source_files.course_id
+                    WHERE courses.name = ?
+                )
+                """,
+                (name,),
+            )
             cursor = self.connection.execute(
                 "DELETE FROM courses WHERE name = ?",
                 (name,),
