@@ -1,8 +1,10 @@
+import json
 import sqlite3
 
 import pytest
 
 from classcorpus.database import Database
+from classcorpus.models import SlideRecord, SourceFingerprint
 
 
 def test_database_defaults_to_shared_database_path(monkeypatch, tmp_path):
@@ -42,6 +44,153 @@ def test_schema_enables_fts(tmp_path):
     }
 
     assert "slide_fts" in names
+
+
+def test_replace_source_preserves_lossless_extraction_fields(tmp_path):
+    raw = "Title\n\n  indented detail\n" + ("x" * 120_000) + "\n"
+    db = Database(tmp_path / "db.sqlite3")
+    db.initialize()
+    course = db.upsert_course("Algorithms", tmp_path / "lectures")
+    record = SlideRecord(
+        ordinal=1,
+        kind="page",
+        title="Title",
+        body_text="indented detail",
+        speaker_notes="",
+        raw_text=raw,
+        extraction_status="review-needed",
+        extraction_reasons=("embedded-image",),
+        native_text_chars=len(raw),
+        has_visual_content=True,
+    )
+
+    db.replace_source(
+        course.id,
+        "lecture.pdf",
+        tmp_path / "lectures" / "lecture.pdf",
+        SourceFingerprint(1, 1, "abc", "2"),
+        [record],
+    )
+
+    row = db.connection.execute("SELECT * FROM slides").fetchone()
+    assert row is not None
+    assert row["raw_text"] == raw
+    assert json.loads(row["extraction_reasons"]) == ["embedded-image"]
+    assert row["native_text_chars"] == len(raw)
+    assert row["has_visual_content"] == 1
+
+
+def test_initialize_migrates_legacy_slides_for_review(tmp_path):
+    db = Database(tmp_path / "db.sqlite3")
+
+    with db.connection:
+        db.connection.executescript(
+            """
+            CREATE TABLE courses (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                source_root TEXT NOT NULL
+            );
+
+            CREATE TABLE source_files (
+                id INTEGER PRIMARY KEY,
+                course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                relative_path TEXT NOT NULL,
+                source_path TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                mtime_ns INTEGER NOT NULL,
+                sha256 TEXT NOT NULL,
+                parser_version TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                UNIQUE(course_id, relative_path)
+            );
+
+            CREATE TABLE slides (
+                id INTEGER PRIMARY KEY,
+                source_file_id INTEGER NOT NULL REFERENCES source_files(id) ON DELETE CASCADE,
+                ordinal INTEGER NOT NULL CHECK(ordinal >= 1),
+                kind TEXT NOT NULL CHECK(kind IN ('slide', 'page')),
+                title TEXT NOT NULL,
+                body_text TEXT NOT NULL,
+                speaker_notes TEXT NOT NULL,
+                visual_description TEXT,
+                render_path TEXT,
+                vision_status TEXT NOT NULL DEFAULT 'pending',
+                UNIQUE(source_file_id, ordinal)
+            );
+            """
+        )
+        db.connection.execute(
+            """
+            INSERT INTO courses(id, name, source_root)
+            VALUES (1, 'Algorithms', ?)
+            """,
+            (str((tmp_path / "lectures").resolve()),),
+        )
+        db.connection.execute(
+            """
+            INSERT INTO source_files(
+                id,
+                course_id,
+                relative_path,
+                source_path,
+                size,
+                mtime_ns,
+                sha256,
+                parser_version,
+                status,
+                error_message
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                1,
+                1,
+                "lecture.pdf",
+                str((tmp_path / "lectures" / "lecture.pdf").resolve()),
+                123,
+                456,
+                "abc",
+                "1",
+                "ready",
+                None,
+            ),
+        )
+        db.connection.execute(
+            """
+            INSERT INTO slides(
+                source_file_id,
+                ordinal,
+                kind,
+                title,
+                body_text,
+                speaker_notes,
+                visual_description,
+                render_path,
+                vision_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                1,
+                1,
+                "page",
+                "Legacy title",
+                "Legacy body",
+                "",
+                None,
+                None,
+                "pending",
+            ),
+        )
+
+    db.initialize()
+
+    row = db.connection.execute("SELECT * FROM slides").fetchone()
+    assert row is not None
+    assert row["raw_text"] == "Legacy title\nLegacy body"
+    assert row["extraction_status"] == "review-needed"
+    assert json.loads(row["extraction_reasons"]) == ["legacy-record-not-audited"]
+    assert row["native_text_chars"] == len(row["raw_text"])
 
 
 def test_remove_course_cleans_up_relational_and_fts_rows(tmp_path):

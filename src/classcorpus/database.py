@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import shutil
 from dataclasses import dataclass
@@ -36,6 +37,15 @@ CREATE TABLE IF NOT EXISTS slides (
     title TEXT NOT NULL,
     body_text TEXT NOT NULL,
     speaker_notes TEXT NOT NULL,
+    raw_text TEXT NOT NULL DEFAULT '',
+    extraction_status TEXT NOT NULL DEFAULT 'review-needed'
+        CHECK(extraction_status IN (
+            'text-extracted', 'review-needed', 'visually-reviewed'
+        )),
+    extraction_reasons TEXT NOT NULL DEFAULT '[]',
+    native_text_chars INTEGER NOT NULL DEFAULT 0 CHECK(native_text_chars >= 0),
+    has_visual_content INTEGER NOT NULL DEFAULT 0
+        CHECK(has_visual_content IN (0, 1)),
     visual_description TEXT,
     render_path TEXT,
     vision_status TEXT NOT NULL DEFAULT 'pending',
@@ -89,6 +99,7 @@ class Database:
     def initialize(self) -> None:
         with self.connection:
             self.connection.executescript(SCHEMA)
+            self._migrate_slides()
 
     def upsert_course(self, name: str, source_root: Path) -> Course:
         root = str(source_root.expanduser().resolve())
@@ -233,14 +244,21 @@ class Database:
             ).fetchone()["id"]
 
             for slide in slides:
+                reasons_json = json.dumps(
+                    slide.extraction_reasons,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                )
                 cursor = self.connection.execute(
                     """
                     INSERT INTO slides(
                         source_file_id, ordinal, kind, title, body_text,
-                        speaker_notes, visual_description, render_path,
-                        vision_status
+                        speaker_notes, raw_text, extraction_status,
+                        extraction_reasons, native_text_chars,
+                        has_visual_content, visual_description,
+                        render_path, vision_status
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         source_id,
@@ -249,6 +267,11 @@ class Database:
                         slide.title,
                         slide.body_text,
                         slide.speaker_notes,
+                        slide.raw_text,
+                        slide.extraction_status,
+                        reasons_json,
+                        slide.native_text_chars,
+                        int(slide.has_visual_content),
                         slide.visual_description,
                         slide.render_path,
                         "complete" if slide.visual_description else "pending",
@@ -489,6 +512,44 @@ class Database:
                 (source_file_id,),
             )
         }
+
+    def _migrate_slides(self) -> None:
+        columns = {
+            row["name"]
+            for row in self.connection.execute("PRAGMA table_info(slides)")
+        }
+        additions = {
+            "raw_text": "TEXT NOT NULL DEFAULT ''",
+            "extraction_status": "TEXT NOT NULL DEFAULT 'review-needed'",
+            "extraction_reasons": (
+                "TEXT NOT NULL DEFAULT '[\"legacy-record-not-audited\"]'"
+            ),
+            "native_text_chars": "INTEGER NOT NULL DEFAULT 0",
+            "has_visual_content": "INTEGER NOT NULL DEFAULT 0",
+        }
+        added = False
+        for name, declaration in additions.items():
+            if name not in columns:
+                self.connection.execute(
+                    f"ALTER TABLE slides ADD COLUMN {name} {declaration}"
+                )
+                added = True
+        if added:
+            self.connection.execute(
+                """
+                UPDATE slides
+                SET raw_text = CASE
+                        WHEN body_text = '' THEN title
+                        WHEN title = '' THEN body_text
+                        ELSE title || char(10) || body_text
+                    END,
+                    extraction_status = 'review-needed',
+                    extraction_reasons = '["legacy-record-not-audited"]'
+                """
+            )
+            self.connection.execute(
+                "UPDATE slides SET native_text_chars = length(raw_text)"
+            )
 
     def slide_count(self, course_name: str) -> int:
         row = self.connection.execute(
