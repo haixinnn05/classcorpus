@@ -102,15 +102,16 @@ bounded chunks from only the selected record:
 ```bash
 .venv/bin/classcorpus search \
   "Bellman-Ford" --course "Algorithms" --compact --json
-.venv/bin/python scripts/read_record.py \
-  --course "Algorithms" --source "handout.pdf" --ordinal 3 \
+.venv/bin/classcorpus read \
+  "Algorithms" "handout.pdf" 3 \
   --field searchable --json
 ```
 
 Compact mode keeps citations, warnings, ranking signals, and a bounded evidence
 snippet while omitting complete record bodies from the candidate payload.
 Follow `next_offset` with `--offset` only when more evidence is needed. Stored
-lecture evidence is never truncated.
+lecture evidence is never truncated. Agents can use `scripts/read_record.py`
+for the equivalent stable JSON contract.
 
 Inspect course health and recommended next actions:
 

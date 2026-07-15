@@ -94,6 +94,76 @@ def test_unified_cli_indexes_searches_and_reports_course_status(tmp_path: Path):
     assert course_status["next_actions"]
 
 
+def test_unified_cli_reads_bounded_record_chunks(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_cli(
+        "index",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    first = run_cli(
+        "read",
+        "Algorithms",
+        "handout.pdf",
+        "1",
+        "--field",
+        "raw_text",
+        "--limit",
+        "80",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    human = run_cli(
+        "read",
+        "Algorithms",
+        "handout.pdf",
+        "2",
+        "--limit",
+        "20",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(first.stdout)
+    assert first.returncode == 0, first.stderr
+    assert payload["citation"] == "[Algorithms, handout.pdf, Page 1]"
+    assert payload["field"] == "raw_text"
+    assert payload["offset"] == 0
+    assert payload["returned_chars"] == 80
+    assert payload["has_more"] is True
+    assert payload["next_offset"] == 80
+    assert len(payload["text"]) == 80
+    assert human.returncode == 0, human.stderr
+    assert "[Algorithms, handout.pdf, Page 2]" in human.stdout
+    assert "Continue: classcorpus read" in human.stdout
+    assert "--offset 20" in human.stdout
+
+
+def test_unified_cli_read_errors_use_json_envelope(tmp_path: Path):
+    result = run_cli(
+        "read",
+        "Algorithms",
+        "missing.pdf",
+        "1",
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert payload["error"]["type"] == "ValueError"
+    assert "record not found" in payload["error"]["message"]
+
+
 def test_status_identifies_failed_refresh_and_exact_retry_command(tmp_path: Path):
     course = tmp_path / "Algorithms"
     course.mkdir()

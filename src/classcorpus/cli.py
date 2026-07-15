@@ -4,6 +4,7 @@ import argparse
 from dataclasses import asdict
 import json
 from pathlib import Path
+import shlex
 import sys
 from typing import Any
 
@@ -13,6 +14,7 @@ from classcorpus.diagnostics import doctor_report
 from classcorpus.encoders import create_encoder
 from classcorpus.indexer import sync_course
 from classcorpus.payloads import compact_search_result
+from classcorpus.record_text import RECORD_TEXT_FIELDS, read_record_text
 from classcorpus.search import search, suggest_terms
 from classcorpus.status import status_report
 
@@ -69,6 +71,23 @@ def build_parser() -> CLIArgumentParser:
     search_parser.add_argument("--compact", action="store_true")
     _add_json_argument(search_parser)
     search_parser.set_defaults(handler=_run_search)
+
+    read_parser = subparsers.add_parser(
+        "read",
+        help="Read a bounded text chunk from one exact record.",
+    )
+    read_parser.add_argument("course")
+    read_parser.add_argument("source")
+    read_parser.add_argument("ordinal", type=int)
+    read_parser.add_argument(
+        "--field",
+        choices=RECORD_TEXT_FIELDS,
+        default="searchable",
+    )
+    read_parser.add_argument("--offset", type=int, default=0)
+    read_parser.add_argument("--limit", type=int, default=8_000)
+    _add_json_argument(read_parser)
+    read_parser.set_defaults(handler=_run_read)
 
     status_parser = subparsers.add_parser(
         "status",
@@ -222,6 +241,46 @@ def _run_search(arguments: argparse.Namespace) -> int:
         print(payload["message"])
         if payload["suggested_terms"]:
             print("Did you mean: " + ", ".join(payload["suggested_terms"]))
+    return 0
+
+
+def _run_read(arguments: argparse.Namespace) -> int:
+    chunk = read_record_text(
+        _database(),
+        course=arguments.course,
+        source_file=arguments.source,
+        ordinal=arguments.ordinal,
+        field=arguments.field,
+        offset=arguments.offset,
+        limit=arguments.limit,
+    )
+    payload = {"ok": True, **asdict(chunk)}
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0
+
+    title = chunk.title or "(untitled)"
+    print(f"{chunk.citation} {title}")
+    print(chunk.text if chunk.text else f"(no text in {chunk.field})")
+    end = chunk.offset + chunk.returned_chars
+    print(f"\nCharacters {chunk.offset}-{end} of {chunk.total_chars}.")
+    if chunk.next_offset is not None:
+        command = shlex.join(
+            [
+                "classcorpus",
+                "read",
+                chunk.course,
+                chunk.source_file,
+                str(chunk.ordinal),
+                "--field",
+                chunk.field,
+                "--offset",
+                str(chunk.next_offset),
+                "--limit",
+                str(arguments.limit),
+            ]
+        )
+        print(f"Continue: {command}")
     return 0
 
 
