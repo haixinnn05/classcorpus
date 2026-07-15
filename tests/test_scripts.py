@@ -326,8 +326,9 @@ def test_failed_refresh_requests_sync_and_marks_results_stale(tmp_path: Path):
     assert result.returncode == 0
     assert payload["sync_required"] is True
     assert payload["warnings"][0]["type"] == "source_failed"
-    assert payload["results"][0]["source_status"] == "failed"
-    assert payload["results"][0]["source_error"]
+    source = payload["sources"][payload["results"][0]["source_id"]]
+    assert source["source_status"] == "failed"
+    assert source["source_error"]
 
 
 def test_ready_results_are_not_described_as_stale_when_other_source_failed(
@@ -370,7 +371,10 @@ def test_ready_results_are_not_described_as_stale_when_other_source_failed(
 
     payload = json.loads(result.stdout)
     assert payload["sync_required"] is True
-    assert {item["source_status"] for item in payload["results"]} == {"ready"}
+    assert {
+        payload["sources"][item["source_id"]]["source_status"]
+        for item in payload["results"]
+    } == {"ready"}
     assert "returned results are from ready sources" in payload["message"].lower()
 
 
@@ -404,7 +408,8 @@ def test_search_script_accepts_source_and_ordinal_filters(tmp_path: Path):
 
     payload = json.loads(result.stdout)
     assert result.returncode == 0, result.stderr
-    assert payload["results"][0]["source_file"] == "handout.pdf"
+    source_id = payload["results"][0]["source_id"]
+    assert payload["sources"][source_id]["source_file"] == "handout.pdf"
     assert payload["results"][0]["ordinal"] == 2
 
 
@@ -480,6 +485,7 @@ def test_compact_search_omits_large_content_then_exact_read_restores_it(
         "Algorithms",
         "--limit",
         "1",
+        "--full",
         "--json",
         data_dir=data_dir,
         cwd=tmp_path,
@@ -534,6 +540,9 @@ def test_compact_search_omits_large_content_then_exact_read_restores_it(
     assert len(compact.stdout) < 5_000
     assert len(compact.stdout) < len(full.stdout) * 0.05
     assert compact_payload["compact"] is True
+    assert compact_payload["deprecated_options"] == ["--compact"]
+    assert compact_payload["estimated_tokens"] <= 1_200
+    assert compact_payload["budget_tokens"] == 1_200
     assert compact_payload["omitted_content_chars"] > 100_000
     assert compact_result["citation"] == (
         "[Algorithms, handout.pdf, Page 1]"
@@ -553,6 +562,46 @@ def test_compact_search_omits_large_content_then_exact_read_restores_it(
     assert bounded_payload["returned_chars"] == 8_000
     assert bounded_payload["has_more"] is True
     assert bounded_payload["next_offset"] == 8_000
+
+
+def test_outline_script_returns_compact_complete_coverage(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    outline = run_script(
+        "outline_lectures.py",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    exhaustive = run_script(
+        "read_lectures.py",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(outline.stdout)
+    assert outline.returncode == 0, outline.stderr
+    assert payload["total_records"] == 2
+    assert payload["returned_records"] == 2
+    assert payload["has_more"] is False
+    assert payload["next_cursor"] is None
+    assert len(outline.stdout) < len(exhaustive.stdout) * 0.4
 
 
 def test_read_script_validation_uses_json_error_envelope(tmp_path: Path):

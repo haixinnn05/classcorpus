@@ -57,7 +57,7 @@ def read_record_text(
     ordinal: int,
     field: RecordTextField = "searchable",
     offset: int = 0,
-    limit: int = 8_000,
+    limit: int = 2_000,
 ) -> RecordTextChunk:
     if ordinal < 1:
         raise ValueError("ordinal must be at least 1")

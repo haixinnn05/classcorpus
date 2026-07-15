@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from _common import argument_parser, emit, fail
 from _embeddings import create_encoder
-from classcorpus.citations import format_citation
 from classcorpus.database import Database
-from classcorpus.payloads import compact_search_result
+from classcorpus.payloads import (
+    DEFAULT_SEARCH_BUDGET_TOKENS,
+    search_response,
+)
 from classcorpus.search import search, suggest_terms
 
 
@@ -17,7 +17,7 @@ def main() -> int:
     parser.add_argument("--course")
     parser.add_argument("--source")
     parser.add_argument("--ordinal", type=int)
-    parser.add_argument("--limit", type=int, default=8)
+    parser.add_argument("--limit", type=int)
     parser.add_argument("--semantic", action="store_true")
     parser.add_argument(
         "--backend",
@@ -27,6 +27,12 @@ def main() -> int:
     parser.add_argument("--model")
     parser.add_argument("--dimensions", type=int, default=384)
     parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--full", action="store_true")
+    parser.add_argument(
+        "--budget-tokens",
+        type=int,
+        default=DEFAULT_SEARCH_BUDGET_TOKENS,
+    )
     parser.add_argument("--json", action="store_true", dest="json_mode")
     args = parser.parse_args()
     try:
@@ -47,20 +53,16 @@ def main() -> int:
             course=args.course,
             source_file=args.source,
             ordinal=args.ordinal,
-            limit=args.limit,
+            limit=(
+                args.limit
+                if args.limit is not None
+                else (8 if args.full else 6)
+            ),
             encoder=encoder,
         )
-        payload = (
-            [compact_search_result(result) for result in results]
-            if args.compact
-            else [
-                {**asdict(result), "citation": format_citation(result)}
-                for result in results
-            ]
-        )
         health = database.source_health(args.course)
-        source_warnings = list(database.source_failures(args.course))
-        source_warnings.extend(
+        warnings = list(database.source_failures(args.course))
+        warnings.extend(
             {
                 "type": "extraction_review_needed",
                 "course": result.course,
@@ -74,55 +76,54 @@ def main() -> int:
             for result in results
             if result.extraction_status == "review-needed"
         )
-        sync_required = health.total == 0 or health.failed > 0
-        response = {
-            "ok": True,
-            "results": payload,
-            "sync_required": sync_required,
-            "warnings": source_warnings,
-            "compact": args.compact,
-            "omitted_content_chars": (
-                sum(int(item["omitted_content_chars"]) for item in payload)
-                if args.compact
-                else 0
+        message = _message(results, total=health.total, failed=health.failed)
+        response = search_response(
+            results,
+            warnings=warnings,
+            sync_required=health.total == 0 or health.failed > 0,
+            suggested_terms=(
+                [] if results else suggest_terms(database, args.query)
             ),
-            "suggested_terms": (
-                [] if payload else suggest_terms(database, args.query)
-            ),
-        }
-        if not payload:
-            if health.total == 0:
-                response["message"] = (
-                    "No indexed course evidence is available. Synchronize the "
-                    "course with index_lectures.py."
-                )
-            elif health.failed > 0:
-                response["message"] = (
-                    "No evidence matched and one or more sources failed their "
-                    "latest refresh. Synchronize the course and inspect warnings."
-                )
-            else:
-                response["message"] = (
-                    "No indexed evidence matched. Search with alternative terms "
-                    "or adjust the source and ordinal filters."
-                )
-        elif health.failed > 0:
-            if any(result.source_status == "failed" for result in results):
-                response["message"] = (
-                    "Some returned results come from sources whose latest refresh "
-                    "failed. Synchronize the course and inspect warnings before "
-                    "relying on them."
-                )
-            else:
-                response["message"] = (
-                    "Other indexed sources failed their latest refresh; returned "
-                    "results are from ready sources. Synchronize the course and "
-                    "inspect warnings for missing coverage."
-                )
+            message=message,
+            full=args.full,
+            budget_tokens=args.budget_tokens,
+            compact_option_used=args.compact,
+        )
         emit(response, json_mode=args.json_mode)
         return 0
     except Exception as error:
         return fail(error, json_mode=args.json_mode)
+
+
+def _message(results, *, total: int, failed: int) -> str | None:
+    if not results:
+        if total == 0:
+            return (
+                "No indexed course evidence is available. Synchronize the "
+                "course with index_lectures.py."
+            )
+        if failed:
+            return (
+                "No evidence matched and one or more sources failed their "
+                "latest refresh. Synchronize the course and inspect warnings."
+            )
+        return (
+            "No indexed evidence matched. Search with alternative terms or "
+            "adjust the source and ordinal filters."
+        )
+    if failed and any(result.source_status == "failed" for result in results):
+        return (
+            "Some returned results come from sources whose latest refresh "
+            "failed. Synchronize the course and inspect warnings before "
+            "relying on them."
+        )
+    if failed:
+        return (
+            "Other indexed sources failed their latest refresh; returned "
+            "results are from ready sources. Synchronize the course and "
+            "inspect warnings for missing coverage."
+        )
+    return None
 
 
 if __name__ == "__main__":

@@ -80,6 +80,11 @@ def test_unified_cli_indexes_searches_and_reports_course_status(tmp_path: Path):
         "[Algorithms, handout.pdf, Page 2]"
     )
     assert search_payload["compact"] is True
+    assert search_payload["deprecated_options"] == ["--compact"]
+    assert search_payload["estimated_tokens"] <= 1_200
+    assert search_payload["budget_tokens"] == 1_200
+    source_id = search_payload["results"][0]["source_id"]
+    assert search_payload["sources"][source_id]["source_file"] == "handout.pdf"
     assert "raw_text" not in search_payload["results"][0]
     assert status.returncode == 0, status.stderr
     assert status_payload["course_count"] == 1
@@ -213,8 +218,91 @@ def test_status_identifies_failed_refresh_and_exact_retry_command(tmp_path: Path
     assert course_status["sources_failed"] == 1
     assert "classcorpus index" in course_status["next_actions"][0]
     assert str(course) in course_status["next_actions"][0]
-    assert search_payload["results"][0]["source_status"] == "failed"
+    source_id = search_payload["results"][0]["source_id"]
+    assert search_payload["sources"][source_id]["source_status"] == "failed"
     assert "latest refresh failed" in search_payload["message"]
+
+
+def test_search_is_compact_by_default_and_full_is_explicit(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_cli(
+        "index",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    compact = run_cli(
+        "search",
+        "precise-content",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    full = run_cli(
+        "search",
+        "precise-content",
+        "--course",
+        "Algorithms",
+        "--full",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    compact_payload = json.loads(compact.stdout)
+    full_payload = json.loads(full.stdout)
+    assert compact_payload["compact"] is True
+    assert compact_payload["continuation"]["type"] == "read_selected"
+    assert "raw_text" not in compact_payload["results"][0]
+    assert full_payload["compact"] is False
+    assert full_payload["budget_tokens"] is None
+    assert len(full_payload["results"][0]["raw_text"]) > 100_000
+    assert len(compact.stdout) < len(full.stdout) * 0.2
+
+
+def test_outline_cli_covers_every_page_with_continuation(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_cli(
+        "index",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_cli(
+        "outline",
+        "Algorithms",
+        "--budget-tokens",
+        "400",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0, result.stderr
+    assert payload["total_records"] == 2
+    assert payload["returned_records"] >= 1
+    assert sum(item["record_count"] for item in payload["coverage"]) == (
+        payload["returned_records"]
+    )
+    assert payload["estimated_tokens"] > 0
+    if payload["has_more"]:
+        assert payload["next_cursor"]
+        assert "classcorpus outline" in payload["continuation"]["command"]
 
 
 def test_status_for_missing_course_gives_index_command(tmp_path: Path):

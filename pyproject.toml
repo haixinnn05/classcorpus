@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "classcorpus"
-version = "0.2.0"
+version = "0.3.0"
 description = "Search local lecture folders with exact citations"
 readme = "SKILL.md"
 requires-python = ">=3.11"
@@ -32,6 +32,11 @@ fastembed = [
 ]
 ocr = [
     "pytesseract>=0.3,<1",
+]
+pdf = [
+    "matplotlib>=3.9,<4",
+    "Pillow>=10,<14",
+    "reportlab>=4,<5",
 ]
 
 [tool.pytest.ini_options]

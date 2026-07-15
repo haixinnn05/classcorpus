@@ -1,9 +1,11 @@
 # Study Workflows
 
 Retrieve evidence across the complete requested scope before drafting. For a
-whole lecture, range, or all/every request, call `read_lectures.py` and follow
-`next_cursor` until `has_more` is false. Verify the number collected equals
-`total_records`; ranked search results alone do not prove full coverage.
+whole lecture, range, or all/every request, call `outline_lectures.py` and
+follow `next_cursor` until `has_more` is false. Verify represented records equal
+`total_records`, then use bounded reads for selected ranges. Use
+`read_lectures.py` only when complete records are required; ranked search
+results alone do not prove full coverage.
 
 Disclose the scope-wide `review_needed` count. Native PPTX extraction can
 preserve text, notes, tables, and embedded images while still lacking exact
@@ -22,6 +24,9 @@ full-slide layout evidence.
 
 - Cover the lecture's main concepts, definitions, examples, equations, and
   instructor notes.
+- Format display equations as mathematics, not monospace programming code.
+  Use fenced `math` blocks for PDF study guides so fractions, Greek symbols,
+  subscripts, superscripts, vectors, and angle notation render naturally.
 - Preserve the taught order when source order is meaningful.
 - Include a short source list with slide/page citations.
 - State whether visual descriptions were available and whether any records

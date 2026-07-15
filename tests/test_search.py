@@ -139,6 +139,30 @@ def test_lexical_reranking_prefers_coverage_over_repetition(
     assert result.lexical_coverage == 1.0
 
 
+def test_multiword_search_omits_candidates_matching_only_one_term(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("CLASSCORPUS_DATA_DIR", str(tmp_path / "data"))
+    root = tmp_path / "Physics"
+    root.mkdir()
+    (root / "lecture.md").write_text(
+        "# Time and Motion\nOne second is a unit of time.",
+        encoding="utf-8",
+    )
+    database = Database(tmp_path / "index.sqlite3")
+    database.initialize()
+    sync_course(database, "Physics", root)
+
+    assert search(database, "second", course="Physics")
+    assert search(database, "Newton second law", course="Physics") == []
+    assert search(
+        database,
+        "time second missing terms",
+        course="Physics",
+    )
+
+
 def test_search_suggests_close_indexed_terms_for_misspelling(
     indexed_course: Database,
 ):

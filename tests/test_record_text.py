@@ -79,6 +79,19 @@ def test_searchable_chunk_is_bounded_and_labels_evidence(
     assert chunk.returned_chars <= 80
 
 
+def test_default_chunk_is_two_thousand_characters(chunked_course: Database):
+    chunk = read_record_text(
+        chunked_course,
+        course="Algorithms",
+        source_file="handout.pdf",
+        ordinal=1,
+        field="raw_text",
+    )
+
+    assert chunk.returned_chars == 2_000
+    assert chunk.next_offset == 2_000
+
+
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [

@@ -21,7 +21,7 @@ def main() -> int:
         default="searchable",
     )
     parser.add_argument("--offset", type=int, default=0)
-    parser.add_argument("--limit", type=int, default=8_000)
+    parser.add_argument("--limit", type=int, default=2_000)
     parser.add_argument("--json", action="store_true", dest="json_mode")
     args = parser.parse_args()
     try:
@@ -47,4 +47,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

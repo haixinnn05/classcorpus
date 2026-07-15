@@ -8,12 +8,18 @@ import shlex
 import sys
 from typing import Any
 
-from classcorpus.citations import format_citation
 from classcorpus.database import Database
 from classcorpus.diagnostics import doctor_report
 from classcorpus.encoders import create_encoder
 from classcorpus.indexer import sync_course
-from classcorpus.payloads import compact_search_result
+from classcorpus.outline import (
+    DEFAULT_OUTLINE_BUDGET_TOKENS,
+    outline_course,
+)
+from classcorpus.payloads import (
+    DEFAULT_SEARCH_BUDGET_TOKENS,
+    search_response,
+)
 from classcorpus.record_text import RECORD_TEXT_FIELDS, read_record_text
 from classcorpus.search import search, suggest_terms
 from classcorpus.status import status_report
@@ -59,7 +65,7 @@ def build_parser() -> CLIArgumentParser:
     search_parser.add_argument("--course")
     search_parser.add_argument("--source")
     search_parser.add_argument("--ordinal", type=int)
-    search_parser.add_argument("--limit", type=int, default=8)
+    search_parser.add_argument("--limit", type=int)
     search_parser.add_argument("--semantic", action="store_true")
     search_parser.add_argument(
         "--backend",
@@ -68,7 +74,21 @@ def build_parser() -> CLIArgumentParser:
     )
     search_parser.add_argument("--model")
     search_parser.add_argument("--dimensions", type=int, default=384)
-    search_parser.add_argument("--compact", action="store_true")
+    search_parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Deprecated; compact output is now the default.",
+    )
+    search_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Return complete record bodies instead of compact candidates.",
+    )
+    search_parser.add_argument(
+        "--budget-tokens",
+        type=int,
+        default=DEFAULT_SEARCH_BUDGET_TOKENS,
+    )
     _add_json_argument(search_parser)
     search_parser.set_defaults(handler=_run_search)
 
@@ -85,9 +105,24 @@ def build_parser() -> CLIArgumentParser:
         default="searchable",
     )
     read_parser.add_argument("--offset", type=int, default=0)
-    read_parser.add_argument("--limit", type=int, default=8_000)
+    read_parser.add_argument("--limit", type=int, default=2_000)
     _add_json_argument(read_parser)
     read_parser.set_defaults(handler=_run_read)
+
+    outline_parser = subparsers.add_parser(
+        "outline",
+        help="Plan exhaustive coverage without loading complete record bodies.",
+    )
+    outline_parser.add_argument("course")
+    outline_parser.add_argument("--source")
+    outline_parser.add_argument("--cursor")
+    outline_parser.add_argument(
+        "--budget-tokens",
+        type=int,
+        default=DEFAULT_OUTLINE_BUDGET_TOKENS,
+    )
+    _add_json_argument(outline_parser)
+    outline_parser.set_defaults(handler=_run_outline)
 
     status_parser = subparsers.add_parser(
         "status",
@@ -173,16 +208,12 @@ def _run_search(arguments: argparse.Namespace) -> int:
         course=arguments.course,
         source_file=arguments.source,
         ordinal=arguments.ordinal,
-        limit=arguments.limit,
+        limit=(
+            arguments.limit
+            if arguments.limit is not None
+            else (8 if arguments.full else 6)
+        ),
         encoder=encoder,
-    )
-    payload_results = (
-        [compact_search_result(result) for result in results]
-        if arguments.compact
-        else [
-            {**asdict(result), "citation": format_citation(result)}
-            for result in results
-        ]
     )
     health = database.source_health(arguments.course)
     warnings = list(database.source_failures(arguments.course))
@@ -198,38 +229,37 @@ def _run_search(arguments: argparse.Namespace) -> int:
         for result in results
         if result.extraction_status == "review-needed"
     )
-    payload: dict[str, Any] = {
-        "ok": True,
-        "results": payload_results,
-        "sync_required": health.total == 0 or health.failed > 0,
-        "warnings": warnings,
-        "compact": arguments.compact,
-        "omitted_content_chars": (
-            sum(int(item["omitted_content_chars"]) for item in payload_results)
-            if arguments.compact
-            else 0
-        ),
-        "suggested_terms": (
-            [] if payload_results else suggest_terms(database, arguments.query)
-        ),
-    }
+    message = None
     if not results:
-        payload["message"] = _empty_search_message(
+        message = _empty_search_message(
             total_sources=health.total,
             failed_sources=health.failed,
         )
     elif health.failed:
         if any(result.source_status == "failed" for result in results):
-            payload["message"] = (
+            message = (
                 "Some returned results come from sources whose latest refresh "
                 "failed. Re-index the course before relying on them."
             )
         else:
-            payload["message"] = (
+            message = (
                 "Other indexed sources failed their latest refresh; returned "
                 "results are from ready sources. Inspect `classcorpus status` "
                 "for missing coverage."
             )
+    payload = search_response(
+        results,
+        warnings=warnings,
+        sync_required=health.total == 0 or health.failed > 0,
+        suggested_terms=(
+            [] if results else suggest_terms(database, arguments.query)
+        ),
+        message=message,
+        full=arguments.full,
+        budget_tokens=arguments.budget_tokens,
+        compact_option_used=arguments.compact,
+    )
+    payload_results = payload["results"]
     if arguments.json_mode:
         _emit_json(payload)
     elif results:
@@ -241,6 +271,34 @@ def _run_search(arguments: argparse.Namespace) -> int:
         print(payload["message"])
         if payload["suggested_terms"]:
             print("Did you mean: " + ", ".join(payload["suggested_terms"]))
+    return 0
+
+
+def _run_outline(arguments: argparse.Namespace) -> int:
+    payload = outline_course(
+        _database(),
+        course=arguments.course,
+        source_file=arguments.source,
+        cursor=arguments.cursor,
+        budget_tokens=arguments.budget_tokens,
+    )
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0
+
+    print(
+        f"{payload['course']}: {payload['total_records']} records; "
+        f"{payload['review_needed']} need review."
+    )
+    sources = payload["sources"]
+    for group in payload["coverage"]:
+        source = sources[group["source_id"]]["source_file"]
+        start = group["start_ordinal"]
+        end = group["end_ordinal"]
+        span = str(start) if start == end else f"{start}-{end}"
+        print(f"{source} {group['kind']} {span}: {group['title'] or '(untitled)'}")
+    if payload["continuation"] is not None:
+        print(f"Continue: {payload['continuation']['command']}")
     return 0
 
 

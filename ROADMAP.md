@@ -20,6 +20,9 @@ All currently planned near-term milestones are complete.
 - Added explainable lexical reranking and local typo suggestions
 - Added compact candidate search with exact full-record drill-down
 - Added bounded, resumable evidence reads for oversized records
+- Made compact, budgeted retrieval the default with lossless `--full` opt-out
+- Added a cursor-based course outline for token-efficient coverage planning
+- Added optional PDF study-guide rendering with human-readable mathematics
 
 ## Later
 

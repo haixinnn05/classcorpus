@@ -218,6 +218,7 @@ def _rerank_lexical(
     query: str,
 ) -> list[SearchResult]:
     tokens = _ranking_tokens(query)
+    minimum_matches = min(2, len(tokens))
     phrase = " ".join(_query_tokens(query))
     reranked: list[SearchResult] = []
     for base_rank, result in enumerate(results, start=1):
@@ -236,6 +237,8 @@ def _rerank_lexical(
         all_tokens = set(_query_tokens(all_text))
         title_matches = sum(token in title_tokens for token in tokens)
         matched_terms = sum(token in all_tokens for token in tokens)
+        if matched_terms < minimum_matches:
+            continue
         coverage = matched_terms / len(tokens)
         title_coverage = title_matches / len(tokens)
         normalized_text = " ".join(_query_tokens(all_text))

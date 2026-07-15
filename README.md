@@ -26,6 +26,7 @@ ClassCorpus provides:
 - Exact embedded PowerPoint image bytes and placement metadata
 - Opt-in, agent-native visual slide descriptions
 - Cited summaries, comparisons, flashcards, exams, cheat sheets, and plans
+- Optional polished PDF study guides with human-readable math notation
 
 ## Requirements
 
@@ -59,6 +60,13 @@ python3 -m venv .venv
 On Windows, use `.venv\Scripts\python.exe` instead.
 
 Restart or reload the agent so it discovers `SKILL.md`.
+
+Install the optional PDF renderer when you want printable study guides:
+
+```bash
+.venv/bin/python -m pip install -e ".[pdf]"
+.venv/bin/python scripts/render_study_guide.py guide.md guide.pdf
+```
 
 Verify the installation:
 
@@ -96,19 +104,23 @@ Search ranking rewards complete query coverage, exact phrases, and title
 matches. A misspelling with no result returns a local "Did you mean" suggestion
 without silently changing the query.
 
-For token-efficient agent retrieval, request compact candidates and then read
-bounded chunks from only the selected record:
+Search is token-efficient by default: it returns at most six compact candidates
+within a 1,200 estimated-token budget. Then read bounded chunks from only the
+selected record:
 
 ```bash
 .venv/bin/classcorpus search \
-  "Bellman-Ford" --course "Algorithms" --compact --json
+  "Bellman-Ford" --course "Algorithms" --json
 .venv/bin/classcorpus read \
   "Algorithms" "handout.pdf" 3 \
   --field searchable --json
 ```
 
-Compact mode keeps citations, warnings, ranking signals, and a bounded evidence
-snippet while omitting complete record bodies from the candidate payload.
+Compact output keeps citations, warnings, extraction state, ranking signals,
+and bounded evidence while deduplicating source metadata. `--compact` remains
+accepted for compatibility. Use `--full` to request the pre-0.3 complete search
+payload.
+
 Follow `next_offset` with `--offset` only when more evidence is needed. Stored
 lecture evidence is never truncated. Agents can use `scripts/read_record.py`
 for the equivalent stable JSON contract.
@@ -123,7 +135,15 @@ Agents continue to use the stable `scripts/*.py --json` contracts documented
 in [references/record-schema.md](references/record-schema.md).
 
 For a complete summary or anything asking for all/every/whole lecture detail,
-iterate the ordered reader until `has_more` is false:
+start with the compact coverage ledger:
+
+```bash
+.venv/bin/classcorpus outline "Algorithms" --json
+```
+
+Follow `next_cursor` until `has_more` is false, then expand only the ranges
+needed for the artifact. When every complete record is explicitly necessary,
+iterate the ordered reader:
 
 ```bash
 .venv/bin/python scripts/read_lectures.py \

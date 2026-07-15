@@ -37,14 +37,17 @@ failures use `cache_cleanup_failed`.
 
 ```text
 python scripts/search_lectures.py QUERY [--course COURSE] \
-  [--source RELATIVE_PATH] [--ordinal N] [--limit N] [--compact] --json
+  [--source RELATIVE_PATH] [--ordinal N] [--limit N] \
+  [--budget-tokens N] [--full] [--compact] --json
 ```
 
-Each result contains course, source file and absolute path, one-based ordinal,
-kind (`slide` or `page`), extracted content, render path, vision status,
-`source_status`, optional `source_error`, score, and a ready-to-use `citation`.
-Lexical results also expose `lexical_coverage`, `lexical_title_matches`, and
-`lexical_phrase_match` so ranking is inspectable.
+Each compact result contains one-based ordinal, kind (`slide` or `page`),
+extraction state, score, bounded evidence, and a ready-to-use `citation`.
+`source_id` resolves course, source path, `source_status`, and optional
+`source_error` through the response-level `sources` map. Lexical results also
+expose `lexical_coverage`, `lexical_title_matches`, and
+`lexical_phrase_match` so ranking is inspectable. `--full` additionally returns
+complete extracted content, render paths, vision state, and asset objects.
 
 The response also contains `warnings` and `sync_required`. Synchronization is
 required when the requested course has no indexed sources or a source's latest
@@ -54,13 +57,19 @@ that it may be stale. An indexed query with no match sets `sync_required: false`
 and may return close indexed vocabulary in `suggested_terms`. Suggestions are
 never substituted automatically; the agent or user decides whether to retry.
 
-With `--compact`, each result omits full body, notes, raw text, visual
+Compact output is the default. Each result omits full body, notes, raw text, visual
 description, OCR text, render paths, and asset objects. It retains a bounded
 query-centered `evidence` snippet, citation, source identity, review state,
 ranking signals, and `omitted_content_chars`. The response-level
+`sources` map stores shared path and health metadata once.
 `omitted_content_chars` reports the total content withheld from that payload.
 Use bounded record retrieval for selected evidence; compact mode never
 truncates stored data.
+
+The default response budget is 1,200 estimated tokens and at most six results.
+`estimated_tokens`, `budget_tokens`, and `budget_exhausted` describe the
+response. `--compact` is accepted as a deprecated no-op; `--full` restores
+complete result records.
 
 `--source` matches the source path relative to the indexed course root.
 `--ordinal` limits results to one one-based slide or page number.
@@ -79,7 +88,7 @@ python scripts/read_record.py --course COURSE \
 Use this command after compact search to retrieve one selected record without
 loading its entire contents. `field` is one of `searchable`, `raw_text`,
 `body_text`, `speaker_notes`, `visual_description`, or `ocr_text`; the default
-is `searchable`. The default chunk is 8,000 characters and the maximum is
+is `searchable`. The default chunk is 2,000 characters and the maximum is
 50,000.
 
 The response contains exact source identity, extraction status, citation,
@@ -87,6 +96,22 @@ The response contains exact source identity, extraction status, citation,
 `next_offset`. Pass `next_offset` back through `--offset` only when more of the
 same field is needed. Character chunks are contiguous and reconstruct the
 stored field without gaps.
+
+## Coverage Outline
+
+```text
+python scripts/outline_lectures.py --course COURSE \
+  [--source RELATIVE_PATH] [--cursor CURSOR] \
+  [--budget-tokens N] --json
+```
+
+Returns `sources`, ordered `coverage` ranges, `total_records`,
+`returned_records`, `remaining_records`, `review_needed`, `warnings`,
+`has_more`, `next_cursor`, `continuation`, and token-budget metadata.
+Consecutive records with the same normalized title and kind are grouped without
+crossing source boundaries. Each range preserves exact start/end ordinals,
+record count, endpoint citations, review count, native text size, and a bounded
+read selector. Following cursors represents every record exactly once.
 
 ## Exhaustive Read
 

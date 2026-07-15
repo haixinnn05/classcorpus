@@ -41,6 +41,8 @@ def test_skill_covers_all_study_workflows(skill_text: str):
 
 def test_skill_is_concise_and_references_detailed_guides(skill_text: str):
     assert len(skill_text.splitlines()) < 500
+    assert len(skill_text.split()) <= 650
+    assert len(skill_text.encode("utf-8")) < 6_000
     assert "references/record-schema.md" in skill_text
     assert "references/citation-rules.md" in skill_text
     assert "references/study-workflows.md" in skill_text
@@ -173,3 +175,10 @@ def test_skill_uses_token_efficient_two_stage_retrieval(skill_text: str):
     assert "--ordinal NUMBER" in skill_text
     assert "next_offset" in skill_text
     assert "Do not fetch full content for every compact candidate" in skill_text
+
+
+def test_skill_requires_human_readable_equations(skill_text: str):
+    assert "fenced `math` blocks" in skill_text
+    assert "scripts/render_study_guide.py" in skill_text
+    assert "SOURCE.md OUTPUT.pdf" in skill_text
+    assert "Never present equations as programming code" in skill_text
