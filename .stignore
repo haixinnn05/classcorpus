@@ -1,0 +1,27 @@
+// Version-control internals and machine-local generated files.
+(?d).git
+(?d).worktrees
+(?d).superpowers
+(?d).venv
+(?d)**/__pycache__
+(?d)**/.pytest_cache
+(?d)**/.ruff_cache
+(?d)**/*.egg-info
+(?d)**/.coverage
+(?d)**/htmlcov
+(?d)**/build
+(?d)**/dist
+(?d)**/out
+(?d)**/coverage
+(?d)**/tmp
+(?d)**/*.log
+(?d)**/.DS_Store
+
+// Keep credentials and machine-local configuration off the mirror.
+(?d)**/.env
+(?d)**/.env.*
+(?d)**/*.pem
+(?d)**/*.key
+(?d)**/*.p12
+(?d)**/*.pfx
+(?d)**/credentials*
