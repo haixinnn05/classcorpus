@@ -13,7 +13,9 @@ and retrieval.
    and optional local embeddings.
 4. `search_lectures.py` returns a ranked subset for focused questions.
 5. `read_lectures.py` cursor-paginates every record for exhaustive requests.
-6. The host agent cites records and optionally adds visual descriptions.
+6. `review_powerpoint.py` inventories layout-dependent records and required
+   review actions.
+7. The host agent cites records and optionally adds visual descriptions.
 
 Updates are content-addressed with SHA-256. A changed source is parsed before
 its old valid records are replaced, and failed refreshes retain stale evidence

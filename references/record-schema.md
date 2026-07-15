@@ -78,6 +78,31 @@ python scripts/vision_queue.py COURSE [--limit N] --json
 Returns viewable records that do not yet have visual descriptions. PDF records
 provide full-page renders; PPTX records may provide embedded image assets.
 
+## PowerPoint Review Report
+
+```text
+python scripts/review_powerpoint.py COURSE [--source RELATIVE_PATH] \
+  [--reason REASON] [--unreviewed-only] [--limit N] [--offset N] --json
+```
+
+Returns every layout-dependent PPTX record matching the filters. The summary
+contains `total_matches`, `returned_items`, `has_more`, `next_offset`,
+`by_reason`, and `by_state`; counts cover the full filtered result, not only the
+current page.
+
+Each item contains exact source metadata, extraction evidence, citation,
+available assets, `review_state`, and `next_action`. States are:
+
+- `full-render-available`: inspect the complete render.
+- `asset-review-available`: embedded assets can be inspected, but slide layout
+  remains unverified.
+- `asset-reviewed-layout-unverified`: assets were described; export to PDF for
+  layout-dependent claims.
+- `pdf-export-required`: no viewable evidence is available.
+
+Valid reason filters are `embedded-image`, `chart-or-diagram`,
+`equation-or-embedded-object`, and `unmapped-ooxml-text`.
+
 ## Store Visual Descriptions
 
 ```text

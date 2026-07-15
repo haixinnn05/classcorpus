@@ -105,3 +105,13 @@ def test_reference_docs_define_exhaustive_read_contract():
     assert "visual_assets" in schema
     assert "read_lectures.py" in workflows
     assert "has_more" in workflows
+
+
+def test_skill_and_schema_define_powerpoint_review_contract(skill_text: str):
+    schema = (ROOT / "references/record-schema.md").read_text(encoding="utf-8")
+
+    assert "review_powerpoint.py" in skill_text
+    assert "next_offset" in skill_text
+    assert "review_powerpoint.py" in schema
+    assert "asset-reviewed-layout-unverified" in schema
+    assert "pdf-export-required" in schema

@@ -128,6 +128,17 @@ It describes the returned diagrams, equations, charts, annotations, and layout,
 then stores those descriptions locally with
 `scripts/store_visual_description.py`. Interrupted work remains queued.
 
+For PowerPoint review planning, inspect the complete layout-risk inventory:
+
+```bash
+.venv/bin/python scripts/review_powerpoint.py \
+  "Algorithms" --source "Lecture08.pptx" --json
+```
+
+The report groups records by extraction reason and reviewability, paginates
+without hiding total counts, and tells the agent whether to inspect embedded
+assets or request a PDF export for full-slide evidence.
+
 ## Optional Semantic Retrieval
 
 Full-text search works immediately. To add a local sentence-transformer:

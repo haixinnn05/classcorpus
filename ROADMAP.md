@@ -5,13 +5,13 @@ application surface.
 
 ## Near Term
 
-- Better review tooling for layout-dependent PowerPoint records
 - Additional local embedding backends
 
 ## Completed
 
 - Generated fixtures for complex charts, equations, SmartArt, and OLE
 - Published retrieval and extraction benchmark corpus
+- Added review tooling for layout-dependent PowerPoint records
 
 ## Later
 

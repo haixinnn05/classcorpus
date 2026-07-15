@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.make_fixtures import make_pdf_fixture
+from tests.fixtures.make_fixtures import make_pdf_fixture, make_pptx_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -124,6 +124,44 @@ def test_vision_queue_and_store_scripts_round_trip(tmp_path: Path):
 
     assert stored.returncode == 0, stored.stderr
     assert json.loads(stored.stdout)["stored"] == 1
+
+
+def test_powerpoint_review_script_reports_layout_actions(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pptx_fixture(
+        course / "Lecture08.pptx",
+        include_audit_slides=True,
+    )
+    data_dir = tmp_path / "state"
+    indexed = run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    reviewed = run_script(
+        "review_powerpoint.py",
+        "Algorithms",
+        "--reason",
+        "chart-or-diagram",
+        "--limit",
+        "1",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    assert indexed.returncode == 0, indexed.stderr
+    assert reviewed.returncode == 0, reviewed.stderr
+    payload = json.loads(reviewed.stdout)
+    assert payload["total_matches"] == 2
+    assert payload["returned_items"] == 1
+    assert payload["has_more"] is True
+    assert payload["next_offset"] == 1
+    assert payload["items"][0]["next_action"] == "export-to-pdf"
 
 
 def test_script_errors_use_json_envelope(tmp_path: Path):
@@ -430,6 +468,7 @@ def test_semantic_search_explains_missing_optional_dependencies(tmp_path: Path):
         ("search_lectures.py", ("--unknown", "--json")),
         ("read_lectures.py", ("--unknown", "--json")),
         ("build_embeddings.py", ("--unknown", "--json")),
+        ("review_powerpoint.py", ("--unknown", "--json")),
         ("vision_queue.py", ("--unknown", "--json")),
         ("store_visual_description.py", ("--unknown", "--json")),
         ("remove_course.py", ("--unknown", "--json")),

@@ -89,6 +89,18 @@ Embedded images are evidence assets, not a reconstruction of the whole slide.
 For exact visual layout, ask the user to export the source presentation to PDF
 with a tool they choose, then index that PDF.
 
+Inventory layout-dependent PowerPoint records before broad visual review:
+
+```text
+python "$SKILL_DIR/scripts/review_powerpoint.py" \
+  "COURSE" [--source "LECTURE.pptx"] [--reason REASON] --json
+```
+
+Follow `next_offset` while `has_more` is true. Use each item's `next_action`:
+inspect available assets only after confirmation, or ask for a PDF export when
+the full slide cannot be reviewed. An `asset-reviewed-layout-unverified` item
+still needs PDF evidence for layout-dependent claims.
+
 ## Visual Analysis
 
 Ask for confirmation before visual analysis because rendered slide images will
