@@ -9,6 +9,18 @@ ExtractionStatus = Literal[
 
 
 @dataclass(frozen=True, slots=True)
+class VisualAsset:
+    path: str
+    kind: str
+    shape_name: str
+    content_type: str
+    left: int
+    top: int
+    width: int
+    height: int
+
+
+@dataclass(frozen=True, slots=True)
 class SlideRecord:
     ordinal: int
     kind: Literal["slide", "page"]
@@ -22,6 +34,7 @@ class SlideRecord:
     has_visual_content: bool = False
     render_path: str | None = None
     visual_description: str | None = None
+    visual_assets: tuple[VisualAsset, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

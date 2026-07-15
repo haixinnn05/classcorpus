@@ -1,12 +1,17 @@
 from pathlib import Path
-import shutil
+import subprocess
 
 import fitz
 import pytest
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from classcorpus.parsers import UnsupportedFormatError, _pdf_audit, parse_source
-from tests.fixtures.make_fixtures import make_pdf_fixture, make_pptx_fixture
+from tests.fixtures.make_fixtures import (
+    _png_bytes,
+    make_pdf_fixture,
+    make_pptx_fixture,
+)
 
 
 @pytest.fixture
@@ -58,9 +63,16 @@ def test_pdf_preserves_pages_and_renders(pdf_fixture: Path, tmp_path: Path):
     assert Path(records[1].render_path).is_file()
 
 
-def test_pptx_preserves_slides_text_tables_notes_and_best_effort_renders(
-    pptx_fixture: Path, tmp_path: Path
+def test_pptx_preserves_content_and_embedded_assets_without_subprocesses(
+    pptx_fixture: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ):
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("PPTX parsing invoked a subprocess"),
+    )
     records = parse_source(pptx_fixture, tmp_path / "renders")
 
     assert len(records) == len(Presentation(pptx_fixture).slides)
@@ -95,11 +107,38 @@ def test_pptx_preserves_slides_text_tables_notes_and_best_effort_renders(
     assert records[4].extraction_reasons == ("equation-or-embedded-object",)
     assert records[4].extraction_status == "review-needed"
     assert records[4].has_visual_content is True
-    if shutil.which("soffice") is not None:
-        assert all(record.render_path is not None for record in records)
-        assert all(Path(record.render_path).is_file() for record in records)
-    else:
-        assert all(record.render_path is None for record in records)
+    assert all(record.render_path is None for record in records)
+
+    source_slide = Presentation(pptx_fixture).slides[0]
+    source_pictures = list(_pictures_in_source_order(source_slide.shapes))
+    assert len(records[0].visual_assets) == 3
+    assert len({asset.path for asset in records[0].visual_assets}) == 1
+    assert all(
+        Path(asset.path).read_bytes() == _png_bytes()
+        for asset in records[0].visual_assets
+    )
+    assert (
+        records[0].visual_assets[0].left,
+        records[0].visual_assets[0].top,
+        records[0].visual_assets[0].width,
+        records[0].visual_assets[0].height,
+    ) == (
+        source_pictures[0].left,
+        source_pictures[0].top,
+        source_pictures[0].width,
+        source_pictures[0].height,
+    )
+
+
+def _pictures_in_source_order(shapes):
+    for shape in shapes:
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            yield from _pictures_in_source_order(shape.shapes)
+        elif shape.shape_type in {
+            MSO_SHAPE_TYPE.PICTURE,
+            MSO_SHAPE_TYPE.LINKED_PICTURE,
+        }:
+            yield shape
 
 
 class _PdfAuditPage:

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter
+import hashlib
+import os
 import re
-import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -11,7 +11,7 @@ import fitz
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-from classcorpus.models import ExtractionStatus, SlideRecord
+from classcorpus.models import ExtractionStatus, SlideRecord, VisualAsset
 
 
 class UnsupportedFormatError(ValueError):
@@ -67,7 +67,6 @@ def _parse_pdf(path: Path, render_dir: Path) -> list[SlideRecord]:
 
 def _parse_pptx(path: Path, render_dir: Path) -> list[SlideRecord]:
     presentation = Presentation(path)
-    rendered_paths = _render_pptx_to_images(path, render_dir, len(presentation.slides))
 
     records: list[SlideRecord] = []
     for ordinal, slide in enumerate(presentation.slides, start=1):
@@ -88,6 +87,7 @@ def _parse_pptx(path: Path, render_dir: Path) -> list[SlideRecord]:
             slide,
             missing_texts,
         )
+        visual_assets = _collect_visual_assets(slide.shapes, render_dir)
 
         notes_text = ""
         try:
@@ -107,7 +107,8 @@ def _parse_pptx(path: Path, render_dir: Path) -> list[SlideRecord]:
                 extraction_reasons=extraction_reasons,
                 native_text_chars=len(raw_text),
                 has_visual_content=has_visual_content,
-                render_path=rendered_paths[ordinal - 1],
+                render_path=None,
+                visual_assets=visual_assets,
             )
         )
 
@@ -273,70 +274,61 @@ def _shape_types(shapes):
             yield from _shape_types(shape.shapes)
 
 
+def _collect_visual_assets(
+    shapes,
+    render_dir: Path,
+) -> tuple[VisualAsset, ...]:
+    assets: list[VisualAsset] = []
+    asset_dir = render_dir / "assets"
+
+    for shape in shapes:
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            assets.extend(_collect_visual_assets(shape.shapes, render_dir))
+            continue
+        if shape.shape_type not in {
+            MSO_SHAPE_TYPE.PICTURE,
+            MSO_SHAPE_TYPE.LINKED_PICTURE,
+        }:
+            continue
+
+        image = shape.image
+        blob = image.blob
+        digest = hashlib.sha256(blob).hexdigest()
+        extension = image.ext or "bin"
+        asset_dir.mkdir(parents=True, exist_ok=True)
+        asset_path = asset_dir / f"{digest}.{extension}"
+        if not asset_path.exists():
+            with tempfile.NamedTemporaryFile(
+                dir=asset_dir,
+                prefix=f".{digest}.",
+                suffix=".tmp",
+                delete=False,
+            ) as stream:
+                stream.write(blob)
+                temporary_path = Path(stream.name)
+            try:
+                os.replace(temporary_path, asset_path)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+
+        assets.append(
+            VisualAsset(
+                path=str(asset_path),
+                kind="image",
+                shape_name=str(shape.name),
+                content_type=str(image.content_type),
+                left=int(shape.left),
+                top=int(shape.top),
+                width=int(shape.width),
+                height=int(shape.height),
+            )
+        )
+
+    return tuple(assets)
+
+
 def _status(reasons: tuple[str, ...]) -> ExtractionStatus:
     return "review-needed" if reasons else "text-extracted"
-
-
-def _render_pptx_to_images(
-    path: Path,
-    render_dir: Path,
-    slide_count: int,
-) -> list[str | None]:
-    soffice = shutil.which("soffice")
-    if soffice is None:
-        return [None] * slide_count
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir)
-        profile_dir = tmp_path / "libreoffice-profile"
-        profile_dir.mkdir()
-        try:
-            subprocess.run(
-                [
-                    soffice,
-                    f"-env:UserInstallation={profile_dir.as_uri()}",
-                    "--headless",
-                    "--convert-to",
-                    "pdf",
-                    "--outdir",
-                    str(tmp_path),
-                    str(path),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except (OSError, subprocess.CalledProcessError):
-            return [None] * slide_count
-
-        pdf_path = tmp_path / f"{path.stem}.pdf"
-        if not pdf_path.is_file():
-            return [None] * slide_count
-
-        rendered = _render_pdf_pages(pdf_path, render_dir, "slide")
-        if len(rendered) < slide_count:
-            rendered.extend([None] * (slide_count - len(rendered)))
-        return rendered[:slide_count]
-
-
-def _render_pdf_pages(
-    path: Path,
-    render_dir: Path,
-    prefix: str,
-) -> list[str]:
-    render_dir.mkdir(parents=True, exist_ok=True)
-
-    rendered_paths: list[str] = []
-    with fitz.open(path) as document:
-        for ordinal, page in enumerate(document, start=1):
-            image_path = render_dir / f"{prefix}-{ordinal:04d}.png"
-            page.get_pixmap(
-                matrix=fitz.Matrix(1.5, 1.5),
-                alpha=False,
-            ).save(image_path)
-            rendered_paths.append(str(image_path))
-
-    return rendered_paths
 
 
 def _split_title_and_body(text: str) -> tuple[str, str]:

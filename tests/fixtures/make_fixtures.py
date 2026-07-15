@@ -60,10 +60,25 @@ def make_pptx_fixture(path: Path, *, include_audit_slides: bool = False) -> Path
         Inches(1),
     )
     nested_textbox.text_frame.text = "Nested group detail."
+    picture_bytes = _png_bytes()
     slide_1.shapes.add_picture(
-        BytesIO(_png_bytes()),
+        BytesIO(picture_bytes),
         Inches(7),
         Inches(1.5),
+        Inches(1),
+        Inches(1),
+    )
+    slide_1.shapes.add_picture(
+        BytesIO(picture_bytes),
+        Inches(7),
+        Inches(3),
+        Inches(1),
+        Inches(1),
+    )
+    group.shapes.add_picture(
+        BytesIO(picture_bytes),
+        Inches(7),
+        Inches(4.5),
         Inches(1),
         Inches(1),
     )
