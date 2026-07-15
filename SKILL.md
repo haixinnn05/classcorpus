@@ -23,6 +23,16 @@ Windows:    "$SKILL_DIR\.venv\Scripts\python.exe" "$SKILL_DIR\scripts\<script>.p
 If that environment does not exist, create it using the README installation
 steps. Do not silently use an unrelated Python environment.
 
+For user-facing setup or troubleshooting, run:
+
+```text
+"$SKILL_DIR/.venv/bin/classcorpus" doctor --json
+"$SKILL_DIR/.venv/bin/classcorpus" status [--course "COURSE"] --json
+```
+
+Use the bundled scripts below for stable agent-facing operations. The unified
+CLI is documented in `references/cli.md`.
+
 ## Mandatory Workflow
 
 1. Synchronize a course when it is new or the user says files changed:

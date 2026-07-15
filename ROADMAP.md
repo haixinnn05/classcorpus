@@ -16,6 +16,7 @@ All currently planned near-term milestones are complete.
 - Added an optional local OCR adapter with explicit confidence reporting
 - Added isolated parser plugins for Markdown and plain-text lectures
 - Added JSON, CSV, and TSV flashcard import/export helpers
+- Added a unified CLI with course status and environment diagnostics
 
 ## Later
 

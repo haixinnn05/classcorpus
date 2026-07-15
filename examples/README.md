@@ -10,10 +10,12 @@ exercise the complete workflow without committing copyrighted lecture decks.
 For a personal lecture folder:
 
 ```bash
-.venv/bin/python scripts/index_lectures.py \
-  "Algorithms" "/absolute/path/to/Algorithms" --json
-.venv/bin/python scripts/search_lectures.py \
-  "shortest paths" --course "Algorithms" --json
+.venv/bin/classcorpus doctor
+.venv/bin/classcorpus index \
+  "Algorithms" "/absolute/path/to/Algorithms"
+.venv/bin/classcorpus search \
+  "shortest paths" --course "Algorithms"
+.venv/bin/classcorpus status --course "Algorithms"
 .venv/bin/python scripts/read_lectures.py \
   --course "Algorithms" --source "lecture-01.pdf" --json
 ```

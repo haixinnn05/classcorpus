@@ -145,3 +145,15 @@ def test_skill_defines_flashcard_interchange_and_overwrite_boundary(
     assert "--overwrite" in skill_text
     assert format_reference.is_file()
     assert "citation" in format_reference.read_text(encoding="utf-8")
+
+
+def test_skill_and_public_docs_define_unified_cli(skill_text: str):
+    cli_reference = ROOT / "references/cli.md"
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "classcorpus" in skill_text
+    assert "doctor" in skill_text
+    assert "status" in skill_text
+    assert cli_reference.is_file()
+    assert "classcorpus index" in cli_reference.read_text(encoding="utf-8")
+    assert ".venv/bin/classcorpus doctor" in readme

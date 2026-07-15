@@ -4,6 +4,10 @@ ClassCorpus is a local Agent Skill, not an application or service. The host
 agent handles reasoning; small Python commands provide deterministic storage
 and retrieval.
 
+The installed `classcorpus` CLI is the human-facing entry point for indexing,
+search, course health, and environment diagnostics. Existing scripts remain
+stable machine-readable interfaces for agents.
+
 ## Data Flow
 
 1. `index_lectures.py` discovers formats registered by parser plugins under a

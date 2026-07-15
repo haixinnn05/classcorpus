@@ -13,6 +13,10 @@ Operational failures exit with status 1 and return:
 }
 ```
 
+The installed `classcorpus index` and `classcorpus search` commands expose the
+same core behavior for human use. `classcorpus status` and
+`classcorpus doctor` are documented in `references/cli.md`.
+
 ## Index
 
 ```text

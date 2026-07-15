@@ -60,29 +60,46 @@ On Windows, use `.venv\Scripts\python.exe` instead.
 
 Restart or reload the agent so it discovers `SKILL.md`.
 
+Verify the installation:
+
+```bash
+.venv/bin/classcorpus doctor
+```
+
+On Windows, run `.venv\Scripts\classcorpus.exe doctor`.
+
 ## Five-Minute Start
 
 Ask the agent:
 
 > Index my Algorithms lectures at `/absolute/path/to/Algorithms`.
 
-The skill runs the equivalent of:
+For direct use:
 
 ```bash
-.venv/bin/python scripts/index_lectures.py \
-  "Algorithms" "/absolute/path/to/Algorithms" --json
+.venv/bin/classcorpus index \
+  "Algorithms" "/absolute/path/to/Algorithms"
 ```
 
 Then ask:
 
 > Explain Bellman-Ford from class and cite the slides.
 
-The agent searches the local index before answering:
+Search the local index:
 
 ```bash
-.venv/bin/python scripts/search_lectures.py \
-  "Bellman-Ford" --course "Algorithms" --json
+.venv/bin/classcorpus search \
+  "Bellman-Ford" --course "Algorithms"
 ```
+
+Inspect course health and recommended next actions:
+
+```bash
+.venv/bin/classcorpus status --course "Algorithms"
+```
+
+Agents continue to use the stable `scripts/*.py --json` contracts documented
+in [references/record-schema.md](references/record-schema.md).
 
 For a complete summary or anything asking for all/every/whole lecture detail,
 iterate the ordered reader until `has_more` is false:
@@ -256,6 +273,8 @@ See [benchmarks/README.md](benchmarks/README.md) for the corpus, metrics, and
 machine-readable benchmark contract.
 See [references/parser-plugins.md](references/parser-plugins.md) for the parser
 extension contract and built-in text format semantics.
+See [references/cli.md](references/cli.md) for unified CLI and diagnostic
+semantics.
 
 ## License
 
