@@ -134,3 +134,14 @@ def test_public_docs_define_parser_plugin_contract(skill_text: str):
     assert "plain-text" in skill_text
     assert plugin_reference.is_file()
     assert "ParserPlugin" in plugin_reference.read_text(encoding="utf-8")
+
+
+def test_skill_defines_flashcard_interchange_and_overwrite_boundary(
+    skill_text: str,
+):
+    format_reference = ROOT / "references/flashcard-formats.md"
+
+    assert "convert_flashcards.py" in skill_text
+    assert "--overwrite" in skill_text
+    assert format_reference.is_file()
+    assert "citation" in format_reference.read_text(encoding="utf-8")

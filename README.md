@@ -187,6 +187,21 @@ mean accepted Tesseract word confidence. This value is not calibrated factual
 certainty; inspect low-confidence text and original visual evidence. No image
 or extracted text is sent to a network service.
 
+## Flashcard Interchange
+
+Convert agent-generated cited cards among JSON, CSV, and TSV:
+
+```bash
+.venv/bin/python scripts/convert_flashcards.py \
+  cards.json cards.tsv --json
+```
+
+The helper preserves multiline content, citations, and tags. It writes
+atomically and refuses to replace an existing file unless `--overwrite` is
+explicit. See
+[references/flashcard-formats.md](references/flashcard-formats.md) for the
+normalized schema and delimited-file rules.
+
 ## Remove Generated Course Data
 
 Removal requires explicit confirmation:

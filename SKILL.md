@@ -191,6 +191,17 @@ Support these evidence-grounded workflows:
 - Study plan
 
 Retrieve first, preserve citations, and state any missing lecture coverage.
+For flashcards, first write the normalized cited JSON schema from
+`references/flashcard-formats.md`. When the user requests CSV or TSV, convert
+that artifact with:
+
+```text
+python "$SKILL_DIR/scripts/convert_flashcards.py" \
+  "INPUT.json" "OUTPUT.tsv" --json
+```
+
+Do not overwrite an existing export unless the user explicitly requested
+replacement and `--overwrite` is passed.
 
 ## Boundaries
 

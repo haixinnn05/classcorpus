@@ -44,6 +44,9 @@ Produce atomic question-answer pairs. Include:
 ```
 
 Avoid cards unsupported by the retrieved course evidence.
+Use `references/flashcard-formats.md` as the normalized interchange schema.
+Save JSON first, then use `convert_flashcards.py` when the user requests CSV or
+TSV for another study tool. Preserve the citation field during conversion.
 
 ## Practice Exam
 

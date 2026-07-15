@@ -173,3 +173,15 @@ Returns `removed: true` when generated records existed. Omitting `--confirm`
 returns a JSON error and leaves all generated and source data unchanged.
 If cache deletion is interrupted after confirmed removal, the command keeps a
 local pending-deletion manifest; rerun the confirmed command to finish cleanup.
+
+## Flashcard Conversion
+
+```text
+python scripts/convert_flashcards.py INPUT OUTPUT \
+  [--input-format json|csv|tsv] [--output-format json|csv|tsv] \
+  [--overwrite] --json
+```
+
+Returns `converted`, absolute `input`, and absolute `output`. Existing output
+is an error unless `--overwrite` is explicit. See
+`references/flashcard-formats.md` for field and format semantics.

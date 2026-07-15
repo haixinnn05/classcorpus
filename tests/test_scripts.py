@@ -510,6 +510,54 @@ def test_hashing_embeddings_work_without_optional_dependencies(tmp_path: Path):
     assert search_payload["results"][0]["title"] == "Dynamic Programming"
 
 
+def test_flashcard_conversion_script_preserves_citations_and_refuses_overwrite(
+    tmp_path: Path,
+):
+    source = tmp_path / "cards.json"
+    output = tmp_path / "cards.tsv"
+    source.write_text(
+        json.dumps(
+            {
+                "cards": [
+                    {
+                        "front": "What is memoization?",
+                        "back": "Caching repeated subproblems.",
+                        "citation": "[Algorithms, Lecture08.pptx, Slide 2]",
+                        "tags": ["dynamic-programming"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    converted = run_script(
+        "convert_flashcards.py",
+        str(source),
+        str(output),
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+    refused = run_script(
+        "convert_flashcards.py",
+        str(source),
+        str(output),
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(converted.stdout)
+    refused_payload = json.loads(refused.stdout)
+    assert converted.returncode == 0, converted.stderr
+    assert payload["converted"] == 1
+    assert "[Algorithms, Lecture08.pptx, Slide 2]" in output.read_text(
+        encoding="utf-8"
+    )
+    assert refused.returncode == 1
+    assert refused_payload["error"]["type"] == "FileExistsError"
+
+
 @pytest.mark.parametrize(
     ("script", "arguments"),
     [
@@ -517,6 +565,7 @@ def test_hashing_embeddings_work_without_optional_dependencies(tmp_path: Path):
         ("search_lectures.py", ("--unknown", "--json")),
         ("read_lectures.py", ("--unknown", "--json")),
         ("build_embeddings.py", ("--unknown", "--json")),
+        ("convert_flashcards.py", ("--unknown", "--json")),
         ("review_powerpoint.py", ("--unknown", "--json")),
         ("vision_queue.py", ("--unknown", "--json")),
         ("store_visual_description.py", ("--unknown", "--json")),
