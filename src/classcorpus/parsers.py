@@ -201,6 +201,11 @@ def _pptx_audit(slide, missing_texts: list[str]) -> tuple[bool, tuple[str, ...]]
     local_tags = {
         node.tag.rsplit("}", 1)[-1].casefold() for node in slide.element.iter()
     }
+    namespaces = {
+        node.tag[1:].split("}", 1)[0].casefold()
+        for node in slide.element.iter()
+        if node.tag.startswith("{")
+    }
     relationship_suffixes = {
         relationship.reltype.rsplit("/", 1)[-1].casefold()
         for relationship in slide.part.rels.values()
@@ -227,6 +232,8 @@ def _pptx_audit(slide, missing_texts: list[str]) -> tuple[bool, tuple[str, ...]]
             }
         )
         or "chart" in local_tags
+        or "http://schemas.openxmlformats.org/drawingml/2006/diagram"
+        in namespaces
         or bool(
             relationship_suffixes
             & {

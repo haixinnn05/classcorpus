@@ -174,6 +174,7 @@ src/classcorpus/       Local parsing, storage, indexing, and retrieval library
 references/            JSON, citation, and study-workflow contracts
 examples/              Reproducible local usage walkthrough
 tests/                 Unit and integration tests with generated fixtures
+benchmarks/            Published synthetic extraction/retrieval benchmark
 ```
 
 See [docs/architecture.md](docs/architecture.md), [docs/privacy.md](docs/privacy.md),
@@ -184,11 +185,14 @@ and [ROADMAP.md](ROADMAP.md) for design boundaries and planned work.
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
-.venv/bin/ruff check src scripts tests
+.venv/bin/ruff check benchmarks src scripts tests
 .venv/bin/python -m pytest -q
+.venv/bin/python -m benchmarks.run
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes.
+See [benchmarks/README.md](benchmarks/README.md) for the corpus, metrics, and
+machine-readable benchmark contract.
 
 ## License
 

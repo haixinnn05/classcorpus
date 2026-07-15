@@ -9,7 +9,7 @@ from classcorpus.models import SourceFingerprint
 from classcorpus.parsers import parse_source
 from classcorpus.paths import create_render_generation
 
-PARSER_VERSION = "3"
+PARSER_VERSION = "4"
 SUPPORTED_SUFFIXES = {".pdf", ".pptx"}
 
 

@@ -1,0 +1,129 @@
+{
+  "version": "1",
+  "course": "Algorithms",
+  "sources": {
+    "handout.pdf": {
+      "record_count": 2
+    },
+    "Lecture08.pptx": {
+      "record_count": 6
+    }
+  },
+  "extraction_cases": [
+    {
+      "id": "pdf-long-text",
+      "source": "handout.pdf",
+      "ordinal": 1,
+      "title": "Long lecture",
+      "status": "text-extracted",
+      "reasons": []
+    },
+    {
+      "id": "pdf-image-page",
+      "source": "handout.pdf",
+      "ordinal": 2,
+      "title": "Diagram",
+      "status": "review-needed",
+      "reasons": ["low-native-text", "embedded-image"]
+    },
+    {
+      "id": "pptx-images-and-ooxml-fallback",
+      "source": "Lecture08.pptx",
+      "ordinal": 1,
+      "title": "Recurrences",
+      "status": "review-needed",
+      "reasons": ["unmapped-ooxml-text", "embedded-image"]
+    },
+    {
+      "id": "pptx-text-table-notes",
+      "source": "Lecture08.pptx",
+      "ordinal": 2,
+      "title": "Dynamic Programming",
+      "status": "text-extracted",
+      "reasons": []
+    },
+    {
+      "id": "pptx-chart",
+      "source": "Lecture08.pptx",
+      "ordinal": 3,
+      "title": "Chart audit",
+      "status": "review-needed",
+      "reasons": ["chart-or-diagram"]
+    },
+    {
+      "id": "pptx-equation",
+      "source": "Lecture08.pptx",
+      "ordinal": 4,
+      "title": "Equation audit",
+      "status": "review-needed",
+      "reasons": ["equation-or-embedded-object"]
+    },
+    {
+      "id": "pptx-smartart",
+      "source": "Lecture08.pptx",
+      "ordinal": 5,
+      "title": "SmartArt audit",
+      "status": "review-needed",
+      "reasons": ["chart-or-diagram"]
+    },
+    {
+      "id": "pptx-ole",
+      "source": "Lecture08.pptx",
+      "ordinal": 6,
+      "title": "OLE audit",
+      "status": "review-needed",
+      "reasons": ["equation-or-embedded-object"]
+    }
+  ],
+  "retrieval_cases": [
+    {
+      "id": "pdf-negative-edge",
+      "query": "negative edges",
+      "source": "handout.pdf",
+      "ordinal": 2
+    },
+    {
+      "id": "pdf-long-content",
+      "query": "precise-content",
+      "source": "handout.pdf",
+      "ordinal": 1
+    },
+    {
+      "id": "pptx-ooxml-fallback",
+      "query": "OOXML fallback detail",
+      "source": "Lecture08.pptx",
+      "ordinal": 1
+    },
+    {
+      "id": "pptx-speaker-notes",
+      "query": "Fibonacci example",
+      "source": "Lecture08.pptx",
+      "ordinal": 2
+    },
+    {
+      "id": "pptx-chart-title",
+      "query": "Chart audit",
+      "source": "Lecture08.pptx",
+      "ordinal": 3
+    },
+    {
+      "id": "pptx-equation-title",
+      "query": "Equation audit",
+      "source": "Lecture08.pptx",
+      "ordinal": 4
+    },
+    {
+      "id": "pptx-smartart-title",
+      "query": "SmartArt audit",
+      "source": "Lecture08.pptx",
+      "ordinal": 5
+    },
+    {
+      "id": "pptx-ole-title",
+      "query": "OLE audit",
+      "source": "Lecture08.pptx",
+      "ordinal": 6
+    }
+  ]
+}
+

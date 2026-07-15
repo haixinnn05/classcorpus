@@ -103,10 +103,14 @@ def test_pptx_preserves_content_and_embedded_assets_without_subprocesses(
     assert records[3].extraction_reasons == ("equation-or-embedded-object",)
     assert records[3].extraction_status == "review-needed"
     assert records[3].has_visual_content is True
-    assert records[4].title == "OLE audit"
-    assert records[4].extraction_reasons == ("equation-or-embedded-object",)
+    assert records[4].title == "SmartArt audit"
+    assert records[4].extraction_reasons == ("chart-or-diagram",)
     assert records[4].extraction_status == "review-needed"
     assert records[4].has_visual_content is True
+    assert records[5].title == "OLE audit"
+    assert records[5].extraction_reasons == ("equation-or-embedded-object",)
+    assert records[5].extraction_status == "review-needed"
+    assert records[5].has_visual_content is True
     assert all(record.render_path is None for record in records)
 
     source_slide = Presentation(pptx_fixture).slides[0]

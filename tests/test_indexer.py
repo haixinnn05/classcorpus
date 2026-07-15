@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from classcorpus.database import Database
-from classcorpus.indexer import fingerprint, sync_course
+from classcorpus.indexer import PARSER_VERSION, fingerprint, sync_course
 from classcorpus.models import SlideRecord
 from tests.fixtures.make_fixtures import make_pdf_fixture, make_pptx_fixture
 
@@ -34,7 +34,7 @@ def test_fingerprint_is_stable_until_content_changes(tmp_path: Path):
     changed = fingerprint(source)
 
     assert first.sha256 == second.sha256
-    assert first.parser_version == "3"
+    assert first.parser_version == PARSER_VERSION
     assert changed.sha256 != first.sha256
 
 
