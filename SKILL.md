@@ -1,6 +1,6 @@
 ---
 name: classcorpus
-description: Index and search local PDF and PowerPoint lecture folders as a persistent, citation-aware course memory. Use when a user wants to add or refresh course materials, answer questions from class, compare concepts across lectures, create cited summaries, flashcards, practice exams, cheat sheets, or study plans, or analyze visual slide content with Codex, Claude Code, or another Agent Skills-compatible assistant.
+description: Index and search local PDF, PowerPoint, Markdown, and text lecture folders as a persistent, citation-aware course memory. Use when a user wants to add or refresh course materials, answer questions from class, compare concepts across lectures, create cited summaries, flashcards, practice exams, cheat sheets, or study plans, or analyze visual slide content with Codex, Claude Code, or another Agent Skills-compatible assistant.
 ---
 
 # ClassCorpus
@@ -100,6 +100,9 @@ Follow `next_offset` while `has_more` is true. Use each item's `next_action`:
 inspect available assets only after confirmation, or ask for a PDF export when
 the full slide cannot be reviewed. An `asset-reviewed-layout-unverified` item
 still needs PDF evidence for layout-dependent claims.
+
+Markdown and plain-text files use one cited page record per UTF-8 file and do
+not have renders. Read `references/parser-plugins.md` before adding a format.
 
 ## Visual Analysis
 

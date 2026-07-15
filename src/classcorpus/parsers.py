@@ -12,6 +12,8 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from classcorpus.models import ExtractionStatus, SlideRecord, VisualAsset
+from classcorpus.parser_plugins import TEXT_PLUGIN
+from classcorpus.parser_registry import ParserPlugin, ParserRegistry
 
 
 class UnsupportedFormatError(ValueError):
@@ -21,12 +23,10 @@ class UnsupportedFormatError(ValueError):
 
 
 def parse_source(path: Path, render_dir: Path) -> list[SlideRecord]:
-    suffix = path.suffix.lower()
-    if suffix == ".pdf":
-        return _parse_pdf(path, render_dir)
-    if suffix == ".pptx":
-        return _parse_pptx(path, render_dir)
-    raise UnsupportedFormatError(suffix)
+    plugin = _PARSER_REGISTRY.parser_for(path.suffix)
+    if plugin is None:
+        raise UnsupportedFormatError(path.suffix.lower())
+    return plugin.parse(path, render_dir)
 
 
 def _parse_pdf(path: Path, render_dir: Path) -> list[SlideRecord]:
@@ -349,4 +349,27 @@ def _normalized_text(text: str) -> str:
     return "\n".join(line.strip() for line in text.splitlines() if line.strip())
 
 
-__all__ = ["UnsupportedFormatError", "parse_source"]
+_PARSER_REGISTRY = ParserRegistry()
+_PARSER_REGISTRY.register(
+    ParserPlugin(name="pdf", suffixes=(".pdf",), parse=_parse_pdf)
+)
+_PARSER_REGISTRY.register(
+    ParserPlugin(name="powerpoint", suffixes=(".pptx",), parse=_parse_pptx)
+)
+_PARSER_REGISTRY.register(TEXT_PLUGIN)
+
+
+def register_parser(plugin: ParserPlugin) -> None:
+    _PARSER_REGISTRY.register(plugin)
+
+
+def supported_suffixes() -> frozenset[str]:
+    return _PARSER_REGISTRY.supported_suffixes()
+
+
+__all__ = [
+    "UnsupportedFormatError",
+    "parse_source",
+    "register_parser",
+    "supported_suffixes",
+]

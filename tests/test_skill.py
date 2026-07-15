@@ -125,3 +125,12 @@ def test_skill_and_schema_define_local_ocr_confidence(skill_text: str):
     assert "uncalibrated" in skill_text
     assert "run_ocr.py" in schema
     assert "PartialOCRFailure" in schema
+
+
+def test_public_docs_define_parser_plugin_contract(skill_text: str):
+    plugin_reference = ROOT / "references/parser-plugins.md"
+
+    assert "Markdown" in skill_text
+    assert "plain-text" in skill_text
+    assert plugin_reference.is_file()
+    assert "ParserPlugin" in plugin_reference.read_text(encoding="utf-8")

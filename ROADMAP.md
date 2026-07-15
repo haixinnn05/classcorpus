@@ -14,10 +14,10 @@ All currently planned near-term milestones are complete.
 - Added review tooling for layout-dependent PowerPoint records
 - Added sentence-transformers, FastEmbed, and dependency-free hashing backends
 - Added an optional local OCR adapter with explicit confidence reporting
+- Added isolated parser plugins for Markdown and plain-text lectures
 
 ## Later
 
-- More lecture formats through isolated parser plugins
 - Import and export helpers for common flashcard formats
 
 ClassCorpus will remain an Agent Skill and local library. A hosted service,

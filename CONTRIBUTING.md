@@ -51,6 +51,11 @@ Keep native extraction and rendering separate. Return `SlideRecord` instances,
 preserve source order, isolate failures to one source file, and add generated
 golden fixtures covering metadata and citations.
 
+Implement new formats as `ParserPlugin` modules and register their suffixes;
+do not add format branches to the indexer. Follow
+`references/parser-plugins.md`, including exact raw-text preservation,
+one-based ordinals, generated-data boundaries, and review reason codes.
+
 ## Reporting Security Or Privacy Issues
 
 Do not include sensitive lecture content in a public issue. Describe the

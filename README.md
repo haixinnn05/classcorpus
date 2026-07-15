@@ -15,7 +15,7 @@ create grounded study materials without repeatedly loading every source file.
 
 ClassCorpus provides:
 
-- Recursive local PDF and PPTX discovery
+- Recursive local PDF, PPTX, Markdown, and plain-text discovery
 - Native text, table, and PowerPoint speaker-note extraction
 - One-based slide/page records and exact source paths
 - Incremental SHA-256 synchronization
@@ -34,10 +34,11 @@ ClassCorpus provides:
 
 PDF pages render through PyMuPDF. PPTX files are read directly with
 `python-pptx` and OOXML: text, notes, tables, and embedded images are preserved
-without launching desktop software. PowerPoint charts, equations, SmartArt,
-OLE objects, and exact slide composition may require review. Export a
-presentation to PDF with a tool of your choice when pixel-accurate full-slide
-evidence is required.
+without launching desktop software. UTF-8 Markdown and text files are indexed
+as one cited page per file through an isolated parser plugin. PowerPoint
+charts, equations, SmartArt, OLE objects, and exact slide composition may
+require review. Export a presentation to PDF with a tool of your choice when
+pixel-accurate full-slide evidence is required.
 
 ## Install As A Skill
 
@@ -238,6 +239,8 @@ python3 -m venv .venv
 See [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes.
 See [benchmarks/README.md](benchmarks/README.md) for the corpus, metrics, and
 machine-readable benchmark contract.
+See [references/parser-plugins.md](references/parser-plugins.md) for the parser
+extension contract and built-in text format semantics.
 
 ## License
 

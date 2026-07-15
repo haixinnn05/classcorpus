@@ -6,11 +6,10 @@ from pathlib import Path
 
 from classcorpus.database import Database
 from classcorpus.models import SourceFingerprint
-from classcorpus.parsers import parse_source
+from classcorpus.parsers import parse_source, supported_suffixes
 from classcorpus.paths import create_render_generation
 
-PARSER_VERSION = "4"
-SUPPORTED_SUFFIXES = {".pdf", ".pptx"}
+PARSER_VERSION = "5"
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +55,7 @@ def sync_course(
     sources = sorted(
         path
         for path in root.rglob("*")
-        if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES
+        if path.is_file() and path.suffix.lower() in supported_suffixes()
     )
     present_relative_paths = {
         source.relative_to(root).as_posix()

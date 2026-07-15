@@ -6,7 +6,8 @@ and retrieval.
 
 ## Data Flow
 
-1. `index_lectures.py` discovers PDF and PPTX files under a course root.
+1. `index_lectures.py` discovers formats registered by parser plugins under a
+   course root.
 2. Parsers preserve native text and extraction evidence without changing the
    source files.
 3. SQLite stores one ordered record per page or slide, plus FTS5 search data
@@ -30,6 +31,9 @@ PDF pages provide extracted text and full-page renders. PPTX files provide
 native text, speaker notes, tables, embedded image bytes, and image geometry.
 They do not provide a pixel-accurate full-slide render. Layout-dependent
 objects are marked for review instead of being silently treated as complete.
+Markdown and plain-text files provide one native-text page record per file.
+New formats implement the same `SlideRecord` contract through isolated parser
+plugins rather than adding discovery branches.
 
 Generated data lives outside lecture folders. No network server or provider API
 is part of the runtime.

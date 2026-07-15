@@ -194,7 +194,7 @@ def test_pdf_audit_flags_only_divergent_native_extractor_tokens():
 
 
 def test_parse_source_rejects_unsupported_formats(tmp_path: Path):
-    source = tmp_path / "lecture.txt"
+    source = tmp_path / "lecture.docx"
     source.write_text("not a lecture", encoding="utf-8")
 
     with pytest.raises(UnsupportedFormatError):

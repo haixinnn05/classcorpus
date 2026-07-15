@@ -20,6 +20,8 @@ python scripts/index_lectures.py COURSE SOURCE_ROOT --json
 ```
 
 Returns `indexed`, `skipped`, `failed`, `failures`, and actionable `warnings`.
+A registered parser plugin determines supported source suffixes. Built-in
+formats are PDF, PPTX, UTF-8 Markdown, and UTF-8 plain text.
 A partial sync exits 1 with `ok: false`, error type `PartialSyncError`, and the
 complete summary while preserving successfully indexed files. PPTX files
 retain native text and embedded image assets but do not produce a full-slide
