@@ -12,7 +12,7 @@ from classcorpus.database import Database
 from classcorpus.diagnostics import doctor_report
 from classcorpus.encoders import create_encoder
 from classcorpus.indexer import sync_course
-from classcorpus.search import search
+from classcorpus.search import search, suggest_terms
 from classcorpus.status import status_report
 
 
@@ -178,6 +178,9 @@ def _run_search(arguments: argparse.Namespace) -> int:
         "results": payload_results,
         "sync_required": health.total == 0 or health.failed > 0,
         "warnings": warnings,
+        "suggested_terms": (
+            [] if payload_results else suggest_terms(database, arguments.query)
+        ),
     }
     if not results:
         payload["message"] = _empty_search_message(
@@ -205,6 +208,8 @@ def _run_search(arguments: argparse.Namespace) -> int:
             print(f"  {result['snippet']}")
     else:
         print(payload["message"])
+        if payload["suggested_terms"]:
+            print("Did you mean: " + ", ".join(payload["suggested_terms"]))
     return 0
 
 

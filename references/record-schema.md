@@ -43,13 +43,16 @@ python scripts/search_lectures.py QUERY [--course COURSE] \
 Each result contains course, source file and absolute path, one-based ordinal,
 kind (`slide` or `page`), extracted content, render path, vision status,
 `source_status`, optional `source_error`, score, and a ready-to-use `citation`.
+Lexical results also expose `lexical_coverage`, `lexical_title_matches`, and
+`lexical_phrase_match` so ranking is inspectable.
 
 The response also contains `warnings` and `sync_required`. Synchronization is
 required when the requested course has no indexed sources or a source's latest
 refresh failed. Retained evidence from a failed refresh remains available with
 `source_status: "failed"` and a `source_failed` warning so the agent can disclose
 that it may be stale. An indexed query with no match sets `sync_required: false`
-and suggests alternative terms or filters.
+and may return close indexed vocabulary in `suggested_terms`. Suggestions are
+never substituted automatically; the agent or user decides whether to retry.
 
 `--source` matches the source path relative to the indexed course root.
 `--ordinal` limits results to one one-based slide or page number.

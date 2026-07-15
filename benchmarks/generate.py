@@ -14,13 +14,23 @@ from pptx.util import Inches
 
 def generate_corpus(output_dir: Path) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    return {
+    generated = {
         "handout.pdf": make_pdf_fixture(output_dir / "handout.pdf"),
         "Lecture08.pptx": make_pptx_fixture(
             output_dir / "Lecture08.pptx",
             include_audit_slides=True,
         ),
     }
+    generated["programming-glossary.md"] = _write_text_fixture(
+        output_dir / "programming-glossary.md",
+        "# Programming Glossary\n\n"
+        + ("Dynamic programming language terminology. " * 30),
+    )
+    generated["edge-notes.txt"] = _write_text_fixture(
+        output_dir / "edge-notes.txt",
+        "Edge Notes\n" + ("Negative weights need careful handling. " * 30),
+    )
+    return generated
 
 
 def make_pdf_fixture(path: Path) -> Path:
@@ -198,6 +208,11 @@ def png_bytes() -> bytes:
     pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 32, 32), False)
     pixmap.clear_with(180)
     return pixmap.tobytes("png")
+
+
+def _write_text_fixture(path: Path, content: str) -> Path:
+    path.write_text(content, encoding="utf-8")
+    return path
 
 
 def main() -> int:

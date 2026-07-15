@@ -3,11 +3,36 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, replace
+from difflib import get_close_matches
 from typing import Literal
 
 from classcorpus.database import Database
 from classcorpus.embeddings import Encoder, semantic_ranking
 from classcorpus.models import ExtractionStatus, VisualAsset
+
+_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "for",
+        "from",
+        "how",
+        "in",
+        "is",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "what",
+        "when",
+        "where",
+        "why",
+        "with",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +62,9 @@ class SearchResult:
     ocr_status: str
     snippet: str
     score: float
+    lexical_coverage: float = 0.0
+    lexical_title_matches: int = 0
+    lexical_phrase_match: bool = False
     visual_assets: tuple[VisualAsset, ...] = ()
 
 
@@ -68,7 +96,8 @@ def search(
         filter_clauses.append("slides.ordinal = ?")
         parameters.append(ordinal)
     filter_sql = "".join(f" AND {clause}" for clause in filter_clauses)
-    parameters.append(limit)
+    candidate_limit = max(limit * 4, 32)
+    parameters.append(candidate_limit)
 
     rows = database.connection.execute(
         f"""
@@ -97,21 +126,26 @@ def search(
             slides.ocr_backend,
             slides.ocr_status,
             snippet(slide_fts, -1, '[', ']', '...', 20) AS snippet,
-            -bm25(slide_fts) AS score
+            -bm25(slide_fts, 0.0, 5.0, 2.0, 3.0, 2.0, 1.5) AS score
         FROM slide_fts
         JOIN slides ON slides.id = CAST(slide_fts.slide_id AS INTEGER)
         JOIN source_files ON source_files.id = slides.source_file_id
         JOIN courses ON courses.id = source_files.course_id
         WHERE slide_fts MATCH ?
         {filter_sql}
-        ORDER BY bm25(slide_fts), slides.id
+        ORDER BY
+            bm25(slide_fts, 0.0, 5.0, 2.0, 3.0, 2.0, 1.5),
+            slides.id
         LIMIT ?
         """,
         parameters,
     ).fetchall()
-    fts_results = [_row_to_search_result(database, row) for row in rows]
+    fts_results = _rerank_lexical(
+        [_row_to_search_result(database, row) for row in rows],
+        query,
+    )
     if encoder is None:
-        return fts_results
+        return fts_results[:limit]
 
     semantic_ids = semantic_ranking(
         database,
@@ -145,6 +179,99 @@ def _fts_query(query: str) -> str:
     if not tokens:
         raise ValueError("query must not be blank")
     return " OR ".join(f'"{token}"' for token in tokens)
+
+
+def suggest_terms(
+    database: Database,
+    query: str,
+    *,
+    limit: int = 5,
+) -> list[str]:
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    tokens = _query_tokens(query)
+    suggestions: list[str] = []
+    for token in tokens:
+        if len(token) < 4:
+            continue
+        rows = database.connection.execute(
+            """
+            SELECT term
+            FROM slide_fts_vocab
+            WHERE length(term) BETWEEN ? AND ?
+            ORDER BY doc DESC, term
+            LIMIT 2000
+            """,
+            (max(1, len(token) - 2), len(token) + 2),
+        ).fetchall()
+        candidates = [str(row["term"]) for row in rows]
+        for match in get_close_matches(token, candidates, n=2, cutoff=0.72):
+            if match != token and match not in suggestions:
+                suggestions.append(match)
+                if len(suggestions) == limit:
+                    return suggestions
+    return suggestions
+
+
+def _rerank_lexical(
+    results: list[SearchResult],
+    query: str,
+) -> list[SearchResult]:
+    tokens = _ranking_tokens(query)
+    phrase = " ".join(_query_tokens(query))
+    reranked: list[SearchResult] = []
+    for base_rank, result in enumerate(results, start=1):
+        title_tokens = set(_query_tokens(result.title))
+        all_text = "\n".join(
+            value
+            for value in (
+                result.title,
+                result.body_text,
+                result.speaker_notes,
+                result.visual_description,
+                result.ocr_text,
+            )
+            if value
+        )
+        all_tokens = set(_query_tokens(all_text))
+        title_matches = sum(token in title_tokens for token in tokens)
+        matched_terms = sum(token in all_tokens for token in tokens)
+        coverage = matched_terms / len(tokens)
+        title_coverage = title_matches / len(tokens)
+        normalized_text = " ".join(_query_tokens(all_text))
+        phrase_match = bool(phrase and phrase in normalized_text)
+        score = (
+            4.0 * coverage
+            + 1.5 * title_coverage
+            + 2.0 * float(phrase_match)
+            + 1.0 / (60 + base_rank)
+        )
+        reranked.append(
+            replace(
+                result,
+                score=score,
+                lexical_coverage=coverage,
+                lexical_title_matches=title_matches,
+                lexical_phrase_match=phrase_match,
+            )
+        )
+    reranked.sort(
+        key=lambda result: (
+            -result.score,
+            result.slide_id,
+        )
+    )
+    return reranked
+
+
+def _query_tokens(text: str) -> list[str]:
+    return re.findall(r"\w+", text.casefold(), flags=re.UNICODE)
+
+
+def _ranking_tokens(query: str) -> list[str]:
+    tokens = list(dict.fromkeys(_query_tokens(query)))
+    informative = [token for token in tokens if token not in _STOPWORDS]
+    return informative or tokens
 
 
 def reciprocal_rank_fusion(
@@ -217,4 +344,9 @@ def _results_by_id(
     }
 
 
-__all__ = ["SearchResult", "reciprocal_rank_fusion", "search"]
+__all__ = [
+    "SearchResult",
+    "reciprocal_rank_fusion",
+    "search",
+    "suggest_terms",
+]

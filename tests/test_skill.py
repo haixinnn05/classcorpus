@@ -157,3 +157,8 @@ def test_skill_and_public_docs_define_unified_cli(skill_text: str):
     assert cli_reference.is_file()
     assert "classcorpus index" in cli_reference.read_text(encoding="utf-8")
     assert ".venv/bin/classcorpus doctor" in readme
+
+
+def test_skill_keeps_typo_suggestions_explicit(skill_text: str):
+    assert "suggested_terms" in skill_text
+    assert "substitute a suggestion silently" in skill_text

@@ -92,6 +92,10 @@ Search the local index:
   "Bellman-Ford" --course "Algorithms"
 ```
 
+Search ranking rewards complete query coverage, exact phrases, and title
+matches. A misspelling with no result returns a local "Did you mean" suggestion
+without silently changing the query.
+
 Inspect course health and recommended next actions:
 
 ```bash

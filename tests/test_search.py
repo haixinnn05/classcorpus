@@ -6,7 +6,7 @@ import pytest
 from classcorpus.citations import format_citation
 from classcorpus.database import Database
 from classcorpus.indexer import sync_course
-from classcorpus.search import SearchResult, search
+from classcorpus.search import SearchResult, search, suggest_terms
 from tests.fixtures.make_fixtures import make_pdf_fixture, make_pptx_fixture
 
 
@@ -91,6 +91,59 @@ def test_search_finds_speaker_notes_and_table_text(indexed_course: Database):
     assert notes[0].source_file == "Lecture08.pptx"
     assert notes[0].ordinal == 2
     assert table[0].ordinal == 2
+
+
+def test_search_exposes_full_coverage_title_and_phrase_signals(
+    indexed_course: Database,
+):
+    result = search(
+        indexed_course,
+        "dynamic programming memoization",
+        course="Algorithms",
+        limit=1,
+    )[0]
+
+    assert result.title == "Dynamic Programming"
+    assert result.lexical_coverage == 1.0
+    assert result.lexical_title_matches == 2
+    assert result.lexical_phrase_match is True
+
+
+def test_lexical_reranking_prefers_coverage_over_repetition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("CLASSCORPUS_DATA_DIR", str(tmp_path / "data"))
+    root = tmp_path / "Algorithms"
+    root.mkdir()
+    (root / "target.md").write_text(
+        "# Dynamic Programming\nMemoization avoids repeated subproblems.",
+        encoding="utf-8",
+    )
+    (root / "distractor.md").write_text(
+        "# Programming Glossary\n" + ("memoization " * 100),
+        encoding="utf-8",
+    )
+    database = Database(tmp_path / "index.sqlite3")
+    database.initialize()
+    sync_course(database, "Algorithms", root)
+
+    result = search(
+        database,
+        "dynamic programming memoization repeated subproblems",
+        course="Algorithms",
+        limit=1,
+    )[0]
+
+    assert result.source_file == "target.md"
+    assert result.lexical_coverage == 1.0
+
+
+def test_search_suggests_close_indexed_terms_for_misspelling(
+    indexed_course: Database,
+):
+    assert search(indexed_course, "memoiztion", course="Algorithms") == []
+    assert "memoization" in suggest_terms(indexed_course, "memoiztion")
 
 
 def test_search_returns_powerpoint_visual_assets(indexed_course: Database):

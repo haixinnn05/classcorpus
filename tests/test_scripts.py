@@ -258,6 +258,36 @@ def test_indexed_no_match_suggests_alternative_terms_without_sync(
     assert "alternative terms" in payload["message"]
 
 
+def test_search_script_suggests_close_indexed_term_for_typo(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pptx_fixture(course / "Lecture08.pptx")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_script(
+        "search_lectures.py",
+        "memoiztion",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0
+    assert payload["results"] == []
+    assert "memoization" in payload["suggested_terms"]
+
+
 def test_failed_refresh_requests_sync_and_marks_results_stale(tmp_path: Path):
     course = tmp_path / "Algorithms"
     course.mkdir()

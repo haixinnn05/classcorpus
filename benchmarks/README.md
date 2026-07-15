@@ -30,12 +30,14 @@ Generate only the source corpus with:
 
 ## Corpus
 
-Version 1 contains:
+Version 2 contains:
 
 - A two-page PDF with very long native text and a mixed text/image page.
 - A six-slide PPTX covering nested groups, notes, tables, repeated embedded
   images, OOXML fallback text, a chart, an Office Math equation, DrawingML
   SmartArt, and an OLE object.
+- Markdown and plain-text distractors that repeat partial query terms. These
+  prove that full multi-term coverage outranks raw repetition.
 
 [`manifest.json`](manifest.json) is the benchmark contract. It records source
 and record counts, exact extraction statuses/reasons, and expected retrieval
@@ -55,4 +57,3 @@ platform and is not a reliable correctness signal. It also does not claim to
 measure OCR quality, pixel-accurate PowerPoint rendering, or performance on
 real lecture distributions. New benchmark versions should expand those claims
 only with redistributable evidence and explicit expected results.
-

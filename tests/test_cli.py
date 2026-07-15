@@ -3,11 +3,12 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import sysconfig
 
 import pytest
 
 from classcorpus.diagnostics import doctor_report
-from tests.fixtures.make_fixtures import make_pdf_fixture
+from tests.fixtures.make_fixtures import make_pdf_fixture, make_pptx_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -209,6 +210,33 @@ def test_unified_cli_has_human_readable_status(tmp_path: Path):
     assert "Next:" in result.stdout
 
 
+def test_unified_cli_prints_typo_suggestion_for_human_search(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pptx_fixture(course / "Lecture08.pptx")
+    data_dir = tmp_path / "state"
+    run_cli(
+        "index",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_cli(
+        "search",
+        "memoiztion",
+        "--course",
+        "Algorithms",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    assert result.returncode == 0
+    assert "Did you mean: memoization" in result.stdout
+
+
 def test_doctor_turns_unusable_data_path_into_failed_checks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -228,7 +256,7 @@ def test_doctor_turns_unusable_data_path_into_failed_checks(
 
 def test_installed_console_entry_point_runs_doctor(tmp_path: Path):
     executable_name = "classcorpus.exe" if os.name == "nt" else "classcorpus"
-    executable = Path(sys.executable).with_name(executable_name)
+    executable = Path(sysconfig.get_path("scripts")) / executable_name
     environment = os.environ.copy()
     environment["CLASSCORPUS_DATA_DIR"] = str(tmp_path / "state")
 

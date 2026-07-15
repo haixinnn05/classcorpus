@@ -18,6 +18,11 @@ scripts. Without `--json`, the CLI prints compact output intended for a person.
 With `--json`, success payloads contain `"ok": true`, and failures exit nonzero
 with a structured error.
 
+Focused search retrieves a wider FTS candidate set, then reranks it using query
+term coverage, exact phrase presence, and title matches. When no record
+matches, close indexed vocabulary is shown as a suggestion without changing or
+rerunning the user's query automatically.
+
 ## Status
 
 `status` reports every indexed course or one selected course:
@@ -44,4 +49,3 @@ Sentence-transformers, FastEmbed, the Python OCR adapter, and the Tesseract
 executable are optional checks. Their absence is reported with installation
 guidance but does not fail the command. A required failure makes `ok` false and
 the process exits nonzero.
-

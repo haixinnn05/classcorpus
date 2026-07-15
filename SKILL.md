@@ -54,6 +54,10 @@ CLI is documented in `references/cli.md`.
    terms when results are weak, incomplete, or conflicting. Never load every
    source file merely to answer one question.
 
+   When search returns no records, inspect `suggested_terms`. Retry a close
+   indexed term only when it preserves the user's intended concept; never
+   substitute a suggestion silently.
+
    For a specific lecture or slide/page, add `--source "RELATIVE/PATH.pptx"`
    and/or `--ordinal NUMBER`.
 

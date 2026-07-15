@@ -84,6 +84,11 @@ CREATE VIRTUAL TABLE IF NOT EXISTS slide_fts USING fts5(
     ocr_text
 );
 
+CREATE VIRTUAL TABLE IF NOT EXISTS slide_fts_vocab USING fts5vocab(
+    slide_fts,
+    'row'
+);
+
 CREATE TABLE IF NOT EXISTS slide_embeddings (
     slide_id INTEGER NOT NULL REFERENCES slides(id) ON DELETE CASCADE,
     model_name TEXT NOT NULL,

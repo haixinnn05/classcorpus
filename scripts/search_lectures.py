@@ -7,7 +7,7 @@ from _common import argument_parser, emit, fail
 from _embeddings import create_encoder
 from classcorpus.citations import format_citation
 from classcorpus.database import Database
-from classcorpus.search import search
+from classcorpus.search import search, suggest_terms
 
 
 def main() -> int:
@@ -74,6 +74,9 @@ def main() -> int:
             "results": payload,
             "sync_required": sync_required,
             "warnings": source_warnings,
+            "suggested_terms": (
+                [] if payload else suggest_terms(database, args.query)
+            ),
         }
         if not payload:
             if health.total == 0:

@@ -1,5 +1,5 @@
 {
-  "version": "1",
+  "version": "2",
   "course": "Algorithms",
   "sources": {
     "handout.pdf": {
@@ -7,6 +7,12 @@
     },
     "Lecture08.pptx": {
       "record_count": 6
+    },
+    "programming-glossary.md": {
+      "record_count": 1
+    },
+    "edge-notes.txt": {
+      "record_count": 1
     }
   },
   "extraction_cases": [
@@ -73,6 +79,22 @@
       "title": "OLE audit",
       "status": "review-needed",
       "reasons": ["equation-or-embedded-object"]
+    },
+    {
+      "id": "markdown-distractor",
+      "source": "programming-glossary.md",
+      "ordinal": 1,
+      "title": "Programming Glossary",
+      "status": "text-extracted",
+      "reasons": []
+    },
+    {
+      "id": "text-distractor",
+      "source": "edge-notes.txt",
+      "ordinal": 1,
+      "title": "Edge Notes",
+      "status": "text-extracted",
+      "reasons": []
     }
   ],
   "retrieval_cases": [
@@ -123,7 +145,18 @@
       "query": "OLE audit",
       "source": "Lecture08.pptx",
       "ordinal": 6
+    },
+    {
+      "id": "multi-term-coverage-dynamic-programming",
+      "query": "dynamic programming memoization repeated subproblems",
+      "source": "Lecture08.pptx",
+      "ordinal": 2
+    },
+    {
+      "id": "multi-term-coverage-negative-edges",
+      "query": "Bellman-Ford handles negative edges",
+      "source": "handout.pdf",
+      "ordinal": 2
     }
   ]
 }
-
