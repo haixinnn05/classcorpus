@@ -141,16 +141,32 @@ assets or request a PDF export for full-slide evidence.
 
 ## Optional Semantic Retrieval
 
-Full-text search works immediately. To add a local sentence-transformer:
+Full-text search works immediately. For a dependency-free local vector index,
+use deterministic feature hashing:
 
 ```bash
-.venv/bin/python -m pip install -e ".[embeddings]"
-.venv/bin/python scripts/build_embeddings.py "Algorithms" --json
+.venv/bin/python scripts/build_embeddings.py \
+  "Algorithms" --backend hashing --dimensions 384 --json
 .venv/bin/python scripts/search_lectures.py \
-  "cached recursion" --course "Algorithms" --semantic --json
+  "cached recursion" --course "Algorithms" --semantic \
+  --backend hashing --dimensions 384 --json
 ```
 
-This may download model weights. It is never required for baseline use.
+Hashing improves fuzzy lexical matching but is not a learned semantic model.
+For learned local embeddings, install one optional backend:
+
+```bash
+# sentence-transformers
+.venv/bin/python -m pip install -e ".[embeddings]"
+
+# FastEmbed
+.venv/bin/python -m pip install -e ".[fastembed]"
+```
+
+Then pass `--backend sentence-transformers` or `--backend fastembed` to both
+the build and search commands. Learned backends may download model weights on
+first use; inference and vector storage remain local. Embeddings are never
+required for baseline indexing or search.
 
 ## Remove Generated Course Data
 

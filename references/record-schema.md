@@ -127,14 +127,20 @@ Descriptions must contain at least 10 characters. Storage is atomic.
 ## Optional Embeddings
 
 ```text
-python scripts/build_embeddings.py COURSE [--model MODEL] --json
+python scripts/build_embeddings.py COURSE \
+  [--backend sentence-transformers|fastembed|hashing] \
+  [--model MODEL] [--dimensions N] --json
 ```
 
-This command requires the `embeddings` optional dependency group. Baseline
-indexing and full-text search never require a model download.
+The default `sentence-transformers` backend requires the `embeddings` optional
+dependency group. FastEmbed requires the `fastembed` group. The `hashing`
+backend is built in, accepts `--dimensions` instead of `--model`, and requires
+no dependency or model download.
 
-Pass `--semantic` and the same optional `--model` value to
-`search_lectures.py` to combine stored vectors with FTS results.
+Pass `--semantic` and the same backend configuration to `search_lectures.py`
+to combine stored vectors with FTS results. The build response returns the
+effective `backend` and stored `model` identity. Baseline indexing and
+full-text search never require embeddings.
 
 ## Remove Course Data
 

@@ -10,7 +10,8 @@ and retrieval.
 2. Parsers preserve native text and extraction evidence without changing the
    source files.
 3. SQLite stores one ordered record per page or slide, plus FTS5 search data
-   and optional local embeddings.
+   and optional local embeddings from sentence-transformers, FastEmbed, or a
+   dependency-free hashing backend.
 4. `search_lectures.py` returns a ranked subset for focused questions.
 5. `read_lectures.py` cursor-paginates every record for exhaustive requests.
 6. `review_powerpoint.py` inventories layout-dependent records and required

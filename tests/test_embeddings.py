@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from classcorpus.database import Database
+from classcorpus.encoders import HashingEncoder
 from classcorpus.embeddings import build_embeddings
 from classcorpus.indexer import sync_course
 from classcorpus.search import reciprocal_rank_fusion, search
@@ -82,3 +83,26 @@ def test_rank_fusion_rewards_results_in_both_rankings():
     scores = reciprocal_rank_fusion([[1, 2], [2, 3]])
     assert scores[2] > scores[1]
     assert scores[2] > scores[3]
+
+
+def test_hashing_backend_builds_and_reuses_local_vectors(
+    indexed_course: Database,
+):
+    encoder = HashingEncoder(dimensions=128)
+    count = build_embeddings(indexed_course, "Algorithms", encoder)
+    results = search(
+        indexed_course,
+        "memoization subproblems",
+        course="Algorithms",
+        encoder=HashingEncoder(dimensions=128),
+    )
+    stored_models = {
+        str(row["model_name"])
+        for row in indexed_course.connection.execute(
+            "SELECT DISTINCT model_name FROM slide_embeddings"
+        )
+    }
+
+    assert count == 2
+    assert results[0].title == "Dynamic Programming"
+    assert stored_models == {"hashing-v1:128"}

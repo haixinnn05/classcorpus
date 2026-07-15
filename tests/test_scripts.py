@@ -461,6 +461,55 @@ def test_semantic_search_explains_missing_optional_dependencies(tmp_path: Path):
     assert ".[embeddings]" in payload["error"]["message"]
 
 
+def test_hashing_embeddings_work_without_optional_dependencies(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pptx_fixture(course / "Lecture08.pptx")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    built = run_script(
+        "build_embeddings.py",
+        "Algorithms",
+        "--backend",
+        "hashing",
+        "--dimensions",
+        "128",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    searched = run_script(
+        "search_lectures.py",
+        "memoization subproblems",
+        "--course",
+        "Algorithms",
+        "--semantic",
+        "--backend",
+        "hashing",
+        "--dimensions",
+        "128",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    built_payload = json.loads(built.stdout)
+    search_payload = json.loads(searched.stdout)
+    assert built.returncode == 0, built.stderr
+    assert built_payload["backend"] == "hashing"
+    assert built_payload["model"] == "hashing-v1:128"
+    assert built_payload["embedded"] == 2
+    assert searched.returncode == 0, searched.stderr
+    assert search_payload["results"][0]["title"] == "Dynamic Programming"
+
+
 @pytest.mark.parametrize(
     ("script", "arguments"),
     [

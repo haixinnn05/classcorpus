@@ -5,13 +5,14 @@ application surface.
 
 ## Near Term
 
-- Additional local embedding backends
+All currently planned near-term milestones are complete.
 
 ## Completed
 
 - Generated fixtures for complex charts, equations, SmartArt, and OLE
 - Published retrieval and extraction benchmark corpus
 - Added review tooling for layout-dependent PowerPoint records
+- Added sentence-transformers, FastEmbed, and dependency-free hashing backends
 
 ## Later
 

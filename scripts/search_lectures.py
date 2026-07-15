@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from _common import argument_parser, emit, fail
-from _embeddings import SentenceTransformerEncoder
+from _embeddings import create_encoder
 from classcorpus.citations import format_citation
 from classcorpus.database import Database
 from classcorpus.search import search
@@ -19,16 +19,23 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=8)
     parser.add_argument("--semantic", action="store_true")
     parser.add_argument(
-        "--model",
-        default="sentence-transformers/all-MiniLM-L6-v2",
+        "--backend",
+        choices=("sentence-transformers", "fastembed", "hashing"),
+        default="sentence-transformers",
     )
+    parser.add_argument("--model")
+    parser.add_argument("--dimensions", type=int, default=384)
     parser.add_argument("--json", action="store_true", dest="json_mode")
     args = parser.parse_args()
     try:
         database = Database()
         database.initialize()
         encoder = (
-            SentenceTransformerEncoder(args.model)
+            create_encoder(
+                args.backend,
+                model_name=args.model,
+                dimensions=args.dimensions,
+            )
             if args.semantic
             else None
         )

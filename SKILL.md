@@ -134,22 +134,28 @@ Never claim an unrendered or undescribed visual detail was inspected.
 
 ## Optional Semantic Search
 
-Baseline SQLite full-text search requires no model download. Only when the user
-chooses local semantic search and the optional dependencies are installed, run:
+Baseline SQLite full-text search requires no model download. For a
+dependency-free local vector index, use deterministic feature hashing:
 
 ```text
-python "$SKILL_DIR/scripts/build_embeddings.py" "COURSE" --json
+python "$SKILL_DIR/scripts/build_embeddings.py" \
+  "COURSE" --backend hashing --dimensions 384 --json
 ```
 
 Then opt into hybrid retrieval:
 
 ```text
 python "$SKILL_DIR/scripts/search_lectures.py" \
-  "QUERY" --course "COURSE" --semantic --json
+  "QUERY" --course "COURSE" --semantic \
+  --backend hashing --dimensions 384 --json
 ```
 
-Use the same `--model` value for building and searching when overriding the
-default. Do not require embeddings for normal indexing or search.
+Hashing is fuzzy lexical retrieval, not a learned semantic model. When the user
+chooses a learned local backend, install `.[embeddings]` for
+`sentence-transformers` or `.[fastembed]` for FastEmbed, then pass the selected
+`--backend` to both commands. Learned backends may download model weights.
+Use the same backend, model, and hashing dimensions for building and searching.
+Do not require embeddings for normal indexing or search.
 
 ## Study Requests
 
