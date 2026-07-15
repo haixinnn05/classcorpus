@@ -44,6 +44,7 @@ plugins rather than adding discovery branches.
 Generated data lives outside lecture folders. No network server or provider API
 is part of the runtime.
 
-Flashcard conversion is a stateless interchange helper. It reads and writes
-user-selected JSON, CSV, or TSV artifacts and does not add generated study
-content to the course index.
+Flashcard rendering and conversion are stateless output helpers. They read
+user-selected JSON and write self-contained HTML, CSV, or TSV artifacts without
+adding generated study content to the course index. Interactive HTML runs
+entirely in the browser with no network service or persistent study database.

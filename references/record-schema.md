@@ -242,6 +242,15 @@ local pending-deletion manifest; rerun the confirmed command to finish cleanup.
 ## Flashcard Conversion
 
 ```text
+python scripts/render_flashcards.py INPUT.json OUTPUT.html \
+  [--title TITLE] [--overwrite] --json
+```
+
+Returns `rendered`, absolute `input`, absolute `output`, and `title`. The
+self-contained HTML runs offline and keeps known/review state only in memory.
+Existing output is an error unless `--overwrite` is explicit.
+
+```text
 python scripts/convert_flashcards.py INPUT OUTPUT \
   [--input-format json|csv|tsv] [--output-format json|csv|tsv] \
   [--overwrite] --json

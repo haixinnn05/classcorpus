@@ -52,8 +52,11 @@ Produce atomic question-answer pairs. Include:
 
 Avoid cards unsupported by the retrieved course evidence.
 Use `references/flashcard-formats.md` as the normalized interchange schema.
-Save JSON first, then use `convert_flashcards.py` when the user requests CSV or
-TSV for another study tool. Preserve the citation field during conversion.
+Save cited JSON first as the portable source, then run `render_flashcards.py`
+to create a self-contained interactive HTML deck by default. Give the user a
+readable question/answer list when HTML cannot be displayed. Use
+`convert_flashcards.py` only when the user requests CSV or TSV for another
+study tool. Preserve citations in every output.
 
 ## Practice Exam
 

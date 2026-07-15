@@ -734,6 +734,57 @@ def test_flashcard_conversion_script_preserves_citations_and_refuses_overwrite(
     assert refused_payload["error"]["type"] == "FileExistsError"
 
 
+def test_flashcard_render_script_creates_interactive_html_and_refuses_overwrite(
+    tmp_path: Path,
+):
+    source = tmp_path / "cards.json"
+    output = tmp_path / "cards.html"
+    source.write_text(
+        json.dumps(
+            {
+                "cards": [
+                    {
+                        "front": "What is memoization?",
+                        "back": "Caching repeated subproblems.",
+                        "citation": "[Algorithms, Lecture08.pptx, Slide 2]",
+                        "tags": ["dynamic-programming"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    rendered = run_script(
+        "render_flashcards.py",
+        str(source),
+        str(output),
+        "--title",
+        "Algorithms Review",
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+    refused = run_script(
+        "render_flashcards.py",
+        str(source),
+        str(output),
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(rendered.stdout)
+    refused_payload = json.loads(refused.stdout)
+    document = output.read_text(encoding="utf-8")
+    assert rendered.returncode == 0, rendered.stderr
+    assert payload["rendered"] == 1
+    assert payload["title"] == "Algorithms Review"
+    assert "<title>Algorithms Review</title>" in document
+    assert "[Algorithms, Lecture08.pptx, Slide 2]" in document
+    assert refused.returncode == 1
+    assert refused_payload["error"]["type"] == "FileExistsError"
+
+
 @pytest.mark.parametrize(
     ("script", "arguments"),
     [
@@ -743,6 +794,7 @@ def test_flashcard_conversion_script_preserves_citations_and_refuses_overwrite(
         ("read_record.py", ("--unknown", "--json")),
         ("build_embeddings.py", ("--unknown", "--json")),
         ("convert_flashcards.py", ("--unknown", "--json")),
+        ("render_flashcards.py", ("--unknown", "--json")),
         ("review_powerpoint.py", ("--unknown", "--json")),
         ("vision_queue.py", ("--unknown", "--json")),
         ("store_visual_description.py", ("--unknown", "--json")),

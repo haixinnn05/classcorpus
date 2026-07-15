@@ -29,7 +29,8 @@ Run the release checks before submitting a change:
 ## Architectural Boundaries
 
 - Keep `SKILL.md` as the user-facing product entry point.
-- Do not add a custom chatbot, application UI, hosted backend, or telemetry.
+- Do not add a custom chatbot, persistent application UI, hosted backend, or
+  telemetry. Self-contained study artifacts remain in scope.
 - Keep baseline search usable without embeddings or cloud APIs.
 - Never modify lecture source files.
 - Keep visual analysis opt-in and provider-neutral.

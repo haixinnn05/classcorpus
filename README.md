@@ -4,8 +4,8 @@ ClassCorpus is an open-source Agent Skill that gives Codex, Claude Code, and
 other Agent Skills-compatible assistants persistent, citation-aware access to
 local lecture materials.
 
-**ClassCorpus is an Agent Skill, not an application.** It has no web interface,
-custom chatbot, hosted backend, account, telemetry, or required model API.
+**ClassCorpus is an Agent Skill, not an application.** It has no persistent web
+app, custom chatbot, hosted backend, account, telemetry, or required model API.
 
 ## What It Solves
 
@@ -26,6 +26,7 @@ ClassCorpus provides:
 - Exact embedded PowerPoint image bytes and placement metadata
 - Opt-in, agent-native visual slide descriptions
 - Cited summaries, comparisons, flashcards, exams, cheat sheets, and plans
+- Self-contained interactive flashcard decks that work offline
 - Optional polished PDF study guides with human-readable math notation
 
 ## Requirements
@@ -250,20 +251,31 @@ mean accepted Tesseract word confidence. This value is not calibrated factual
 certainty; inspect low-confidence text and original visual evidence. No image
 or extracted text is sent to a network service.
 
-## Flashcard Interchange
+## Flashcards
 
-Convert agent-generated cited cards among JSON, CSV, and TSV:
+Save agent-generated cited cards as JSON, then render the default interactive
+deck:
+
+```bash
+.venv/bin/python scripts/render_flashcards.py \
+  cards.json cards.html --title "Algorithms Review" --json
+```
+
+The HTML is self-contained, responsive, keyboard accessible, and offline. It
+supports reveal, navigation, shuffle, topic filters, and session-only
+known/review tracking while preserving citations. It writes atomically and
+refuses to replace an existing file unless `--overwrite` is explicit.
+
+CSV and TSV are optional interchange formats:
 
 ```bash
 .venv/bin/python scripts/convert_flashcards.py \
   cards.json cards.tsv --json
 ```
 
-The helper preserves multiline content, citations, and tags. It writes
-atomically and refuses to replace an existing file unless `--overwrite` is
-explicit. See
+Both helpers preserve multiline content, citations, and tags. See
 [references/flashcard-formats.md](references/flashcard-formats.md) for the
-normalized schema and delimited-file rules.
+normalized schema and output rules.
 
 ## Remove Generated Course Data
 

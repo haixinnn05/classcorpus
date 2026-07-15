@@ -101,8 +101,11 @@ the returned images, and save descriptions with
 
 For a summary, cross-lecture comparison, flashcards, practice exam, cheat
 sheet, or study plan, retrieve requested coverage first and follow
-[references/study-workflows.md](references/study-workflows.md). Use
-`convert_flashcards.py`; never pass `--overwrite` without explicit permission.
+[references/study-workflows.md](references/study-workflows.md). For flashcards,
+save cited JSON first, then create the default interactive deck with
+`render_flashcards.py`. Provide readable text when HTML cannot be displayed.
+Use `convert_flashcards.py` only for requested CSV/TSV exports. Never pass
+`--overwrite` without explicit permission.
 
 For Markdown or PDF guides, write equations in fenced `math` blocks.
 Never present equations as programming code. Render with

@@ -144,9 +144,14 @@ def test_skill_defines_flashcard_interchange_and_overwrite_boundary(
     format_reference = ROOT / "references/flashcard-formats.md"
 
     assert "convert_flashcards.py" in skill_text
+    assert "render_flashcards.py" in skill_text
+    assert "default interactive deck" in skill_text
+    assert "readable text when HTML cannot be displayed" in skill_text
     assert "--overwrite" in skill_text
     assert format_reference.is_file()
-    assert "citation" in format_reference.read_text(encoding="utf-8")
+    format_text = format_reference.read_text(encoding="utf-8")
+    assert "citation" in format_text
+    assert "no network access" in format_text
 
 
 def test_skill_and_public_docs_define_unified_cli(skill_text: str):
