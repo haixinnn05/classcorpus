@@ -31,6 +31,10 @@ class SearchResult:
     visual_description: str | None
     render_path: str | None
     vision_status: str
+    ocr_text: str | None
+    ocr_confidence: float | None
+    ocr_backend: str | None
+    ocr_status: str
     snippet: str
     score: float
     visual_assets: tuple[VisualAsset, ...] = ()
@@ -88,6 +92,10 @@ def search(
             slides.visual_description,
             slides.render_path,
             slides.vision_status,
+            slides.ocr_text,
+            slides.ocr_confidence,
+            slides.ocr_backend,
+            slides.ocr_status,
             snippet(slide_fts, -1, '[', ']', '...', 20) AS snippet,
             -bm25(slide_fts) AS score
         FROM slide_fts
@@ -190,6 +198,10 @@ def _results_by_id(
             slides.visual_description,
             slides.render_path,
             slides.vision_status,
+            slides.ocr_text,
+            slides.ocr_confidence,
+            slides.ocr_backend,
+            slides.ocr_status,
             slides.title AS snippet,
             0.0 AS score
         FROM slides

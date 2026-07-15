@@ -30,6 +30,10 @@ class LectureRecord:
     visual_description: str | None
     render_path: str | None
     vision_status: str
+    ocr_text: str | None
+    ocr_confidence: float | None
+    ocr_backend: str | None
+    ocr_status: str
     visual_assets: tuple[VisualAsset, ...]
     citation: str
 
@@ -113,7 +117,11 @@ def read_records(
             slides.has_visual_content,
             slides.visual_description,
             slides.render_path,
-            slides.vision_status
+            slides.vision_status,
+            slides.ocr_text,
+            slides.ocr_confidence,
+            slides.ocr_backend,
+            slides.ocr_status
         FROM slides
         JOIN source_files ON source_files.id = slides.source_file_id
         JOIN courses ON courses.id = source_files.course_id

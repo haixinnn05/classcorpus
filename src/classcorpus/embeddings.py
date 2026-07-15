@@ -21,6 +21,7 @@ def _searchable_text(row) -> str:
             row["body_text"],
             row["speaker_notes"],
             row["visual_description"],
+            row["ocr_text"],
         )
         if value
     )
@@ -55,7 +56,7 @@ def build_embeddings(
     rows = database.connection.execute(
         """
         SELECT slides.id, slides.title, slides.body_text, slides.speaker_notes,
-               slides.visual_description
+               slides.visual_description, slides.ocr_text
         FROM slides
         JOIN source_files ON source_files.id = slides.source_file_id
         JOIN courses ON courses.id = source_files.course_id

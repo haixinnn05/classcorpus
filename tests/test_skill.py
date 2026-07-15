@@ -115,3 +115,13 @@ def test_skill_and_schema_define_powerpoint_review_contract(skill_text: str):
     assert "review_powerpoint.py" in schema
     assert "asset-reviewed-layout-unverified" in schema
     assert "pdf-export-required" in schema
+
+
+def test_skill_and_schema_define_local_ocr_confidence(skill_text: str):
+    schema = (ROOT / "references/record-schema.md").read_text(encoding="utf-8")
+
+    assert "run_ocr.py" in skill_text
+    assert "ocr_confidence" in skill_text
+    assert "uncalibrated" in skill_text
+    assert "run_ocr.py" in schema
+    assert "PartialOCRFailure" in schema

@@ -179,6 +179,10 @@ def test_citation_uses_slide_or_page():
         visual_description=None,
         render_path=None,
         vision_status="pending",
+        ocr_text=None,
+        ocr_confidence=None,
+        ocr_backend=None,
+        ocr_status="pending",
         snippet="Memoization",
         score=1.0,
     )
@@ -202,6 +206,10 @@ def test_citation_uses_slide_or_page():
         visual_description=None,
         render_path=None,
         vision_status="pending",
+        ocr_text=None,
+        ocr_confidence=None,
+        ocr_backend=None,
+        ocr_status="pending",
         snippet="Bellman-Ford",
         score=1.0,
     )

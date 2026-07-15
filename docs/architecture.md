@@ -16,7 +16,9 @@ and retrieval.
 5. `read_lectures.py` cursor-paginates every record for exhaustive requests.
 6. `review_powerpoint.py` inventories layout-dependent records and required
    review actions.
-7. The host agent cites records and optionally adds visual descriptions.
+7. Optional local OCR stores separately labeled text, backend, and confidence
+   and refreshes FTS without overwriting native extraction.
+8. The host agent cites records and optionally adds visual descriptions.
 
 Updates are content-addressed with SHA-256. A changed source is parsed before
 its old valid records are replaced, and failed refreshes retain stale evidence

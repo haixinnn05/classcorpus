@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS slides (
     visual_description TEXT,
     render_path TEXT,
     vision_status TEXT NOT NULL DEFAULT 'pending',
+    ocr_text TEXT,
+    ocr_confidence REAL CHECK(
+        ocr_confidence IS NULL
+        OR (ocr_confidence >= 0.0 AND ocr_confidence <= 1.0)
+    ),
+    ocr_backend TEXT,
+    ocr_status TEXT NOT NULL DEFAULT 'pending'
+        CHECK(ocr_status IN ('pending', 'complete', 'failed')),
     UNIQUE(source_file_id, ordinal)
 );
 
@@ -72,7 +80,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS slide_fts USING fts5(
     title,
     body_text,
     speaker_notes,
-    visual_description
+    visual_description,
+    ocr_text
 );
 
 CREATE TABLE IF NOT EXISTS slide_embeddings (
@@ -115,6 +124,7 @@ class Database:
         with self.connection:
             self.connection.executescript(SCHEMA)
             self._migrate_slides()
+            self._migrate_fts()
 
     def upsert_course(self, name: str, source_root: Path) -> Course:
         root = str(source_root.expanduser().resolve())
@@ -319,9 +329,9 @@ class Database:
                     """
                     INSERT INTO slide_fts(
                         slide_id, title, body_text, speaker_notes,
-                        visual_description
+                        visual_description, ocr_text
                     )
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         slide_id,
@@ -329,6 +339,7 @@ class Database:
                         slide.body_text,
                         slide.speaker_notes,
                         slide.visual_description or "",
+                        "",
                     ),
                 )
         return self.cleanup_render_directories(old_render_directories)
@@ -600,6 +611,10 @@ class Database:
             ),
             "native_text_chars": "INTEGER NOT NULL DEFAULT 0",
             "has_visual_content": "INTEGER NOT NULL DEFAULT 0",
+            "ocr_text": "TEXT",
+            "ocr_confidence": "REAL",
+            "ocr_backend": "TEXT",
+            "ocr_status": "TEXT NOT NULL DEFAULT 'pending'",
         }
         added_columns: set[str] = set()
         for name, declaration in additions.items():
@@ -623,6 +638,38 @@ class Database:
             self.connection.execute(
                 "UPDATE slides SET native_text_chars = length(raw_text)"
             )
+
+    def _migrate_fts(self) -> None:
+        columns = {
+            row["name"]
+            for row in self.connection.execute("PRAGMA table_info(slide_fts)")
+        }
+        if not columns or "ocr_text" in columns:
+            return
+        self.connection.execute("DROP TABLE slide_fts")
+        self.connection.execute(
+            """
+            CREATE VIRTUAL TABLE slide_fts USING fts5(
+                slide_id UNINDEXED,
+                title,
+                body_text,
+                speaker_notes,
+                visual_description,
+                ocr_text
+            )
+            """
+        )
+        self.connection.execute(
+            """
+            INSERT INTO slide_fts(
+                slide_id, title, body_text, speaker_notes,
+                visual_description, ocr_text
+            )
+            SELECT id, title, body_text, speaker_notes,
+                   COALESCE(visual_description, ''), COALESCE(ocr_text, '')
+            FROM slides
+            """
+        )
 
     def slide_count(self, course_name: str) -> int:
         row = self.connection.execute(

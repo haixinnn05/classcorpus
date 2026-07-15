@@ -157,6 +157,24 @@ chooses a learned local backend, install `.[embeddings]` for
 Use the same backend, model, and hashing dimensions for building and searching.
 Do not require embeddings for normal indexing or search.
 
+## Optional Local OCR
+
+Use OCR only when the user chooses it and native extraction or visual review
+needs a text backstop. Install `.[ocr]` and a local Tesseract executable, then
+run a small resumable batch:
+
+```text
+python "$SKILL_DIR/scripts/run_ocr.py" \
+  "COURSE" --backend tesseract --language eng --limit 10 --json
+```
+
+OCR remains local and provider-neutral. Treat `ocr_text` as supplemental
+evidence, never as a replacement for `raw_text`. Report `ocr_confidence` and
+`ocr_backend` when relying on OCR-derived claims. Confidence is an uncalibrated
+mean of accepted word confidences, not factual certainty. Inspect the original
+render or asset when confidence is low. Use `--retry-failed` only after fixing
+the reported local OCR error.
+
 ## Study Requests
 
 Support these evidence-grounded workflows:

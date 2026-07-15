@@ -13,10 +13,10 @@ All currently planned near-term milestones are complete.
 - Published retrieval and extraction benchmark corpus
 - Added review tooling for layout-dependent PowerPoint records
 - Added sentence-transformers, FastEmbed, and dependency-free hashing backends
+- Added an optional local OCR adapter with explicit confidence reporting
 
 ## Later
 
-- Optional OCR adapters that remain local and explicitly report confidence
 - More lecture formats through isolated parser plugins
 - Import and export helpers for common flashcard formats
 

@@ -521,6 +521,7 @@ def test_hashing_embeddings_work_without_optional_dependencies(tmp_path: Path):
         ("vision_queue.py", ("--unknown", "--json")),
         ("store_visual_description.py", ("--unknown", "--json")),
         ("remove_course.py", ("--unknown", "--json")),
+        ("run_ocr.py", ("--unknown", "--json")),
     ],
 )
 def test_argument_errors_use_json_envelope(

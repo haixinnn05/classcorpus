@@ -65,7 +65,8 @@ opaque `next_cursor`, scope-wide `review_needed`, and `warnings`.
 
 Each record includes source status/error, title, body, notes, complete
 `raw_text`, extraction status/reasons, native character count, visual
-description, render path, `visual_assets`, and canonical `citation`. Each
+description, OCR text/backend/confidence/status, render path, `visual_assets`,
+and canonical `citation`. Each
 visual asset includes its exact generated path, content type, shape name, kind,
 and PowerPoint EMU geometry (`left`, `top`, `width`, `height`).
 
@@ -141,6 +142,24 @@ Pass `--semantic` and the same backend configuration to `search_lectures.py`
 to combine stored vectors with FTS results. The build response returns the
 effective `backend` and stored `model` identity. Baseline indexing and
 full-text search never require embeddings.
+
+## Optional Local OCR
+
+```text
+python scripts/run_ocr.py COURSE [--backend tesseract] \
+  [--language LANGUAGE] [--limit N] [--retry-failed] --json
+```
+
+The command processes queued PDF renders or PPTX embedded assets locally.
+Successful results contain `text`, `confidence`, and `backend`; the same values
+become visible as `ocr_text`, `ocr_confidence`, `ocr_backend`, and `ocr_status`
+in search and exhaustive-read records. OCR text is indexed by FTS and changes
+invalidate stale slide embeddings.
+
+Confidence is constrained to `0` through `1` and is the mean accepted
+Tesseract word confidence, not calibrated certainty. Per-record failures are
+isolated, marked `failed`, and returned with a `PartialOCRFailure` envelope.
+Use `--retry-failed` after correcting the local dependency or image error.
 
 ## Remove Course Data
 

@@ -168,6 +168,24 @@ the build and search commands. Learned backends may download model weights on
 first use; inference and vector storage remain local. Embeddings are never
 required for baseline indexing or search.
 
+## Optional Local OCR
+
+OCR is opt-in and runs locally. Install the Python adapter plus the Tesseract
+executable provided by your operating system:
+
+```bash
+.venv/bin/python -m pip install -e ".[ocr]"
+.venv/bin/python scripts/run_ocr.py \
+  "Algorithms" --backend tesseract --language eng --json
+```
+
+The command processes a small resumable batch of PDF renders or embedded PPTX
+assets. OCR text becomes searchable while remaining separate from native text.
+Every result reports its backend and a `0` to `1` confidence computed from the
+mean accepted Tesseract word confidence. This value is not calibrated factual
+certainty; inspect low-confidence text and original visual evidence. No image
+or extracted text is sent to a network service.
+
 ## Remove Generated Course Data
 
 Removal requires explicit confirmation:
