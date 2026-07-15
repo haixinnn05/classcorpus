@@ -22,17 +22,22 @@ ClassCorpus provides:
 - Atomic replacement that preserves valid records after parse failures
 - Explicit stale-source warnings when a refresh fails
 - SQLite FTS5 retrieval with optional local embeddings
+- Cursor-based exhaustive reading without model-selected omissions
+- Exact embedded PowerPoint image bytes and placement metadata
 - Opt-in, agent-native visual slide descriptions
 - Cited summaries, comparisons, flashcards, exams, cheat sheets, and plans
 
 ## Requirements
 
 - Python 3.11 or newer
-- LibreOffice only when rendered PowerPoint images are desired
 - No model download for baseline indexing and search
 
-PDF pages render through PyMuPDF. PPTX native content indexes without
-LibreOffice; visual analysis for PPTX requires a local `soffice` executable.
+PDF pages render through PyMuPDF. PPTX files are read directly with
+`python-pptx` and OOXML: text, notes, tables, and embedded images are preserved
+without launching desktop software. PowerPoint charts, equations, SmartArt,
+OLE objects, and exact slide composition may require review. Export a
+presentation to PDF with a tool of your choice when pixel-accurate full-slide
+evidence is required.
 
 ## Install As A Skill
 
@@ -77,6 +82,21 @@ The agent searches the local index before answering:
 .venv/bin/python scripts/search_lectures.py \
   "Bellman-Ford" --course "Algorithms" --json
 ```
+
+For a complete summary or anything asking for all/every/whole lecture detail,
+iterate the ordered reader until `has_more` is false:
+
+```bash
+.venv/bin/python scripts/read_lectures.py \
+  --course "Algorithms" --source "Lecture08.pptx" --json
+.venv/bin/python scripts/read_lectures.py \
+  --course "Algorithms" --source "Lecture08.pptx" \
+  --cursor "NEXT_CURSOR_FROM_PREVIOUS_RESPONSE" --json
+```
+
+The response reports `total_records`, `returned_records`, scope-wide
+`review_needed`, and warnings. Each record contains full `raw_text`, extraction
+evidence, visual assets, and a canonical citation.
 
 Limit retrieval to one lecture and slide/page when needed:
 
@@ -129,7 +149,7 @@ Removal requires explicit confirmation:
 .venv/bin/python scripts/remove_course.py "Algorithms" --confirm --json
 ```
 
-This deletes only ClassCorpus database rows and rendered cache files. It never
+This deletes only ClassCorpus database rows and generated cache files. It never
 modifies lecture sources.
 
 If a refresh fails, ClassCorpus keeps the last valid extracted records but
@@ -152,8 +172,12 @@ SKILL.md               Agent workflow and boundaries
 scripts/               Stable agent-facing commands
 src/classcorpus/       Local parsing, storage, indexing, and retrieval library
 references/            JSON, citation, and study-workflow contracts
+examples/              Reproducible local usage walkthrough
 tests/                 Unit and integration tests with generated fixtures
 ```
+
+See [docs/architecture.md](docs/architecture.md), [docs/privacy.md](docs/privacy.md),
+and [ROADMAP.md](ROADMAP.md) for design boundaries and planned work.
 
 ## Development
 

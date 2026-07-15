@@ -21,10 +21,11 @@ python scripts/index_lectures.py COURSE SOURCE_ROOT --json
 
 Returns `indexed`, `skipped`, `failed`, `failures`, and actionable `warnings`.
 A partial sync exits 1 with `ok: false`, error type `PartialSyncError`, and the
-complete summary while preserving successfully indexed files. A PPTX indexed
-without images reports how to install LibreOffice. Image-only records use
-warning type `image_only`; non-fatal cache cleanup failures use
-`cache_cleanup_failed`.
+complete summary while preserving successfully indexed files. PPTX files
+retain native text and embedded image assets but do not produce a full-slide
+render. Layout-dependent records use `review-needed`; records with no viewable
+evidence may report `visual-source-unavailable`. Non-fatal cache cleanup
+failures use `cache_cleanup_failed`.
 
 ## Search
 
@@ -50,13 +51,32 @@ and suggests alternative terms or filters.
 Argument-validation failures also use the JSON error envelope and exit 1 when
 `--json` is present.
 
+## Exhaustive Read
+
+```text
+python scripts/read_lectures.py --course COURSE \
+  [--source RELATIVE_PATH] [--cursor CURSOR] [--limit N] --json
+```
+
+Use this command for whole lectures, ranges, and all/every/full-scope study
+artifacts. Records are ordered by source path and one-based ordinal. The
+response contains `records`, `total_records`, `returned_records`, `has_more`,
+opaque `next_cursor`, scope-wide `review_needed`, and `warnings`.
+
+Each record includes source status/error, title, body, notes, complete
+`raw_text`, extraction status/reasons, native character count, visual
+description, render path, `visual_assets`, and canonical `citation`. Each
+visual asset includes its exact generated path, content type, shape name, kind,
+and PowerPoint EMU geometry (`left`, `top`, `width`, `height`).
+
 ## Vision Queue
 
 ```text
 python scripts/vision_queue.py COURSE [--limit N] --json
 ```
 
-Returns rendered records that do not yet have visual descriptions.
+Returns viewable records that do not yet have visual descriptions. PDF records
+provide full-page renders; PPTX records may provide embedded image assets.
 
 ## Store Visual Descriptions
 

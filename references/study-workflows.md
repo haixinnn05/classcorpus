@@ -1,8 +1,13 @@
 # Study Workflows
 
-Retrieve evidence across the complete requested scope before drafting. If a
-lecture range is requested, search each lecture or source represented in that
-range rather than relying on one top result.
+Retrieve evidence across the complete requested scope before drafting. For a
+whole lecture, range, or all/every request, call `read_lectures.py` and follow
+`next_cursor` until `has_more` is false. Verify the number collected equals
+`total_records`; ranked search results alone do not prove full coverage.
+
+Disclose the scope-wide `review_needed` count. Native PPTX extraction can
+preserve text, notes, tables, and embedded images while still lacking exact
+full-slide layout evidence.
 
 ## Question Answering
 
@@ -17,7 +22,8 @@ range rather than relying on one top result.
   instructor notes.
 - Preserve the taught order when source order is meaningful.
 - Include a short source list with slide/page citations.
-- State whether visual descriptions were available.
+- State whether visual descriptions were available and whether any records
+  remained `review-needed`.
 
 ## Cross-Lecture Comparison
 

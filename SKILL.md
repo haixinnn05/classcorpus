@@ -12,14 +12,16 @@ storage.
 
 ## Resolve The Skill Directory
 
-Treat the directory containing this `SKILL.md` as `SKILL_DIR`. Run every script
-by absolute path so the workflow does not depend on the current directory:
+Treat the directory containing this `SKILL.md` as `SKILL_DIR`. Prefer the
+repository environment so every agent uses the tested dependencies:
 
 ```text
-python "$SKILL_DIR/scripts/<script>.py" ...
+Unix/macOS: "$SKILL_DIR/.venv/bin/python" "$SKILL_DIR/scripts/<script>.py" ...
+Windows:    "$SKILL_DIR\.venv\Scripts\python.exe" "$SKILL_DIR\scripts\<script>.py" ...
 ```
 
-If `python` is unavailable, use the environment's Python 3 executable.
+If that environment does not exist, create it using the README installation
+steps. Do not silently use an unrelated Python environment.
 
 ## Mandatory Workflow
 
@@ -30,20 +32,31 @@ If `python` is unavailable, use the environment's Python 3 executable.
      "COURSE" "/absolute/path/to/course" --json
    ```
 
-2. Do not answer a course-specific claim before searching. Retrieve a small
-   candidate set:
+2. Do not answer a course-specific claim before searching. For a focused
+   question, retrieve a small ranked candidate set:
 
    ```text
    python "$SKILL_DIR/scripts/search_lectures.py" \
      "QUERY" --course "COURSE" --limit 8 --json
    ```
 
-3. Inspect the returned evidence. Search again with narrower or alternative
+3. Inspect focused-search evidence. Search again with narrower or alternative
    terms when results are weak, incomplete, or conflicting. Never load every
    source file merely to answer one question.
 
    For a specific lecture or slide/page, add `--source "RELATIVE/PATH.pptx"`
    and/or `--ordinal NUMBER`.
+
+   For all/every/whole lecture content, a lecture range, or any exhaustive
+   artifact, do not use ranked search as coverage proof. Run:
+
+   ```text
+   python "$SKILL_DIR/scripts/read_lectures.py" \
+     --course "COURSE" [--source "RELATIVE/PATH.pptx"] --json
+   ```
+
+   Continue with `--cursor "next_cursor"` until `has_more` is false. Preserve
+   every record and verify the number collected equals `total_records`.
 
    If `sync_required` is true, synchronize the course with
    `index_lectures.py` or ask the user for its source folder before answering.
@@ -62,6 +75,19 @@ If `python` is unavailable, use the environment's Python 3 executable.
 
 Read [references/record-schema.md](references/record-schema.md) when consuming
 or producing script JSON.
+
+## Extraction Completeness
+
+`raw_text` is the lossless native text evidence and is never intentionally
+shortened. PDF pages also have full-page renders. PPTX extraction preserves
+native text, speaker notes, tables, and embedded images with their geometry,
+but it does not provide full-slide rendering. Charts, equations, SmartArt, OLE
+objects, and other layout-dependent content can be marked `review-needed`.
+
+Always disclose `review-needed` records in an answer or generated artifact.
+Embedded images are evidence assets, not a reconstruction of the whole slide.
+For exact visual layout, ask the user to export the source presentation to PDF
+with a tool they choose, then index that PDF.
 
 ## Visual Analysis
 

@@ -44,3 +44,64 @@ def test_skill_is_concise_and_references_detailed_guides(skill_text: str):
     assert "references/record-schema.md" in skill_text
     assert "references/citation-rules.md" in skill_text
     assert "references/study-workflows.md" in skill_text
+
+
+def test_skill_uses_repository_python_and_exhaustive_reader(skill_text: str):
+    assert ".venv/bin/python" in skill_text
+    assert r".venv\Scripts\python.exe" in skill_text
+    assert "read_lectures.py" in skill_text
+    assert "has_more" in skill_text
+    assert "next_cursor" in skill_text
+    assert "all/every/whole" in skill_text
+
+
+def test_skill_discloses_extraction_limits(skill_text: str):
+    assert "review-needed" in skill_text
+    assert "embedded images" in skill_text
+    assert "full-slide rendering" in skill_text
+    assert "export" in skill_text.lower()
+    assert "PDF" in skill_text
+
+
+def test_public_docs_have_no_prohibited_converter_references():
+    paths = [
+        ROOT / "README.md",
+        ROOT / "SKILL.md",
+        *sorted((ROOT / "references").glob("*.md")),
+    ]
+    prohibited = (
+        "libre" + "office",
+        "sof" + "fice",
+        "uno" + "conv",
+    )
+
+    for path in paths:
+        text = path.read_text(encoding="utf-8").lower()
+        assert all(term not in text for term in prohibited), path
+
+
+def test_open_source_repository_artifacts_exist():
+    required = (
+        "docs/architecture.md",
+        "docs/privacy.md",
+        "ROADMAP.md",
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml",
+        "examples/README.md",
+    )
+
+    assert all((ROOT / relative_path).is_file() for relative_path in required)
+
+
+def test_reference_docs_define_exhaustive_read_contract():
+    schema = (ROOT / "references/record-schema.md").read_text(encoding="utf-8")
+    workflows = (ROOT / "references/study-workflows.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "read_lectures.py" in schema
+    assert "total_records" in schema
+    assert "raw_text" in schema
+    assert "visual_assets" in schema
+    assert "read_lectures.py" in workflows
+    assert "has_more" in workflows
