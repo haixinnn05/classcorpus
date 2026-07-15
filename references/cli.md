@@ -8,7 +8,8 @@ scripts remain stable agent-facing JSON contracts.
 ```text
 classcorpus index COURSE SOURCE_ROOT [--json]
 classcorpus search QUERY [--course COURSE] [--source PATH] \
-  [--ordinal N] [--limit N] [--semantic] [--backend BACKEND] [--json]
+  [--ordinal N] [--limit N] [--semantic] [--backend BACKEND] \
+  [--compact] [--json]
 classcorpus status [--course COURSE] [--json]
 classcorpus doctor [--json]
 ```
@@ -22,6 +23,12 @@ Focused search retrieves a wider FTS candidate set, then reranks it using query
 term coverage, exact phrase presence, and title matches. When no record
 matches, close indexed vocabulary is shown as a suggestion without changing or
 rerunning the user's query automatically.
+
+Use `--compact --json` for agent or automation candidate selection. It returns
+bounded evidence and metadata instead of complete record bodies. Fetch only
+the chosen records with `read_lectures.py --source PATH --ordinal N --json`.
+This two-stage flow keeps full evidence available while avoiding repeated
+large-record payloads.
 
 ## Status
 

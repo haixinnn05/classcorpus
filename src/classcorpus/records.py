@@ -54,13 +54,18 @@ def read_records(
     *,
     course: str,
     source_file: str | None = None,
+    ordinal: int | None = None,
     cursor: str | None = None,
     limit: int = 20,
 ) -> RecordPage:
     if limit < 1:
         raise ValueError("limit must be at least 1")
+    if ordinal is not None and ordinal < 1:
+        raise ValueError("ordinal must be at least 1")
+    if ordinal is not None and cursor is not None:
+        raise ValueError("cursor cannot be used with ordinal")
     continuation = _decode_cursor(cursor) if cursor is not None else None
-    scope_clause, scope_parameters = _scope(course, source_file)
+    scope_clause, scope_parameters = _scope(course, source_file, ordinal)
 
     summary = database.connection.execute(
         f"""
@@ -167,12 +172,19 @@ def read_records(
     )
 
 
-def _scope(course: str, source_file: str | None) -> tuple[str, list[object]]:
+def _scope(
+    course: str,
+    source_file: str | None,
+    ordinal: int | None,
+) -> tuple[str, list[object]]:
     clauses = ["courses.name = ?"]
     parameters: list[object] = [course]
     if source_file is not None:
         clauses.append("source_files.relative_path = ?")
         parameters.append(source_file)
+    if ordinal is not None:
+        clauses.append("slides.ordinal = ?")
+        parameters.append(ordinal)
     return " AND ".join(clauses), parameters
 
 

@@ -7,6 +7,7 @@ from _common import argument_parser, emit, fail
 from _embeddings import create_encoder
 from classcorpus.citations import format_citation
 from classcorpus.database import Database
+from classcorpus.payloads import compact_search_result
 from classcorpus.search import search, suggest_terms
 
 
@@ -25,6 +26,7 @@ def main() -> int:
     )
     parser.add_argument("--model")
     parser.add_argument("--dimensions", type=int, default=384)
+    parser.add_argument("--compact", action="store_true")
     parser.add_argument("--json", action="store_true", dest="json_mode")
     args = parser.parse_args()
     try:
@@ -48,10 +50,14 @@ def main() -> int:
             limit=args.limit,
             encoder=encoder,
         )
-        payload = [
-            {**asdict(result), "citation": format_citation(result)}
-            for result in results
-        ]
+        payload = (
+            [compact_search_result(result) for result in results]
+            if args.compact
+            else [
+                {**asdict(result), "citation": format_citation(result)}
+                for result in results
+            ]
+        )
         health = database.source_health(args.course)
         source_warnings = list(database.source_failures(args.course))
         source_warnings.extend(
@@ -74,6 +80,12 @@ def main() -> int:
             "results": payload,
             "sync_required": sync_required,
             "warnings": source_warnings,
+            "compact": args.compact,
+            "omitted_content_chars": (
+                sum(int(item["omitted_content_chars"]) for item in payload)
+                if args.compact
+                else 0
+            ),
             "suggested_terms": (
                 [] if payload else suggest_terms(database, args.query)
             ),

@@ -18,12 +18,14 @@ stable machine-readable interfaces for agents.
    and optional local embeddings from sentence-transformers, FastEmbed, or a
    dependency-free hashing backend.
 4. `search_lectures.py` returns a ranked subset for focused questions.
-5. `read_lectures.py` cursor-paginates every record for exhaustive requests.
-6. `review_powerpoint.py` inventories layout-dependent records and required
+5. Compact search selects candidates with bounded evidence; exact
+   source/ordinal reads retrieve full content only for records used.
+6. `read_lectures.py` cursor-paginates every record for exhaustive requests.
+7. `review_powerpoint.py` inventories layout-dependent records and required
    review actions.
-7. Optional local OCR stores separately labeled text, backend, and confidence
+8. Optional local OCR stores separately labeled text, backend, and confidence
    and refreshes FTS without overwriting native extraction.
-8. The host agent cites records and optionally adds visual descriptions.
+9. The host agent cites records and optionally adds visual descriptions.
 
 Updates are content-addressed with SHA-256. A changed source is parsed before
 its old valid records are replaced, and failed refreshes retain stale evidence

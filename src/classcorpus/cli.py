@@ -12,6 +12,7 @@ from classcorpus.database import Database
 from classcorpus.diagnostics import doctor_report
 from classcorpus.encoders import create_encoder
 from classcorpus.indexer import sync_course
+from classcorpus.payloads import compact_search_result
 from classcorpus.search import search, suggest_terms
 from classcorpus.status import status_report
 
@@ -65,6 +66,7 @@ def build_parser() -> CLIArgumentParser:
     )
     search_parser.add_argument("--model")
     search_parser.add_argument("--dimensions", type=int, default=384)
+    search_parser.add_argument("--compact", action="store_true")
     _add_json_argument(search_parser)
     search_parser.set_defaults(handler=_run_search)
 
@@ -155,10 +157,14 @@ def _run_search(arguments: argparse.Namespace) -> int:
         limit=arguments.limit,
         encoder=encoder,
     )
-    payload_results = [
-        {**asdict(result), "citation": format_citation(result)}
-        for result in results
-    ]
+    payload_results = (
+        [compact_search_result(result) for result in results]
+        if arguments.compact
+        else [
+            {**asdict(result), "citation": format_citation(result)}
+            for result in results
+        ]
+    )
     health = database.source_health(arguments.course)
     warnings = list(database.source_failures(arguments.course))
     warnings.extend(
@@ -178,6 +184,12 @@ def _run_search(arguments: argparse.Namespace) -> int:
         "results": payload_results,
         "sync_required": health.total == 0 or health.failed > 0,
         "warnings": warnings,
+        "compact": arguments.compact,
+        "omitted_content_chars": (
+            sum(int(item["omitted_content_chars"]) for item in payload_results)
+            if arguments.compact
+            else 0
+        ),
         "suggested_terms": (
             [] if payload_results else suggest_terms(database, arguments.query)
         ),
@@ -205,7 +217,7 @@ def _run_search(arguments: argparse.Namespace) -> int:
         for result in payload_results:
             title = result["title"] or "(untitled)"
             print(f"{result['citation']} {title}")
-            print(f"  {result['snippet']}")
+            print(f"  {result.get('snippet', result.get('evidence', ''))}")
     else:
         print(payload["message"])
         if payload["suggested_terms"]:

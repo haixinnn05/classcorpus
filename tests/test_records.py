@@ -152,6 +152,35 @@ def test_read_records_source_filter_has_independent_totals(tmp_path: Path):
     assert {record.source_file for record in page.records} == {"b-slides.pptx"}
 
 
+def test_read_records_exact_ordinal_returns_one_complete_record(tmp_path: Path):
+    database = _database_with_two_sources(tmp_path)
+
+    page = read_records(
+        database,
+        course="Algorithms",
+        source_file="a-handout.pdf",
+        ordinal=1,
+    )
+
+    assert page.total_records == 1
+    assert page.returned_records == 1
+    assert page.has_more is False
+    assert page.next_cursor is None
+    assert page.records[0].raw_text.endswith("x" * 1000)
+
+
+def test_read_records_rejects_cursor_with_exact_ordinal(tmp_path: Path):
+    database = _database_with_two_sources(tmp_path)
+
+    with pytest.raises(ValueError, match="cursor cannot be used with ordinal"):
+        read_records(
+            database,
+            course="Algorithms",
+            ordinal=1,
+            cursor="unused",
+        )
+
+
 @pytest.mark.parametrize("cursor", ["not-base64!", "e30=", "W10="])
 def test_read_records_rejects_malformed_cursor(tmp_path: Path, cursor: str):
     database = _database_with_two_sources(tmp_path)
@@ -165,3 +194,10 @@ def test_read_records_requires_positive_limit(tmp_path: Path):
 
     with pytest.raises(ValueError, match="limit"):
         read_records(database, course="Algorithms", limit=0)
+
+
+def test_read_records_requires_positive_ordinal(tmp_path: Path):
+    database = _database_with_two_sources(tmp_path)
+
+    with pytest.raises(ValueError, match="ordinal"):
+        read_records(database, course="Algorithms", ordinal=0)

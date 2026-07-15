@@ -458,6 +458,81 @@ def test_read_script_returns_exhaustive_page_with_citations(tmp_path: Path):
     assert second_payload["records"][0]["ordinal"] == 2
 
 
+def test_compact_search_omits_large_content_then_exact_read_restores_it(
+    tmp_path: Path,
+):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    full = run_script(
+        "search_lectures.py",
+        "precise-content",
+        "--course",
+        "Algorithms",
+        "--limit",
+        "1",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    compact = run_script(
+        "search_lectures.py",
+        "precise-content",
+        "--course",
+        "Algorithms",
+        "--limit",
+        "1",
+        "--compact",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    exact = run_script(
+        "read_lectures.py",
+        "--course",
+        "Algorithms",
+        "--source",
+        "handout.pdf",
+        "--ordinal",
+        "1",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    full_payload = json.loads(full.stdout)
+    compact_payload = json.loads(compact.stdout)
+    exact_payload = json.loads(exact.stdout)
+    compact_result = compact_payload["results"][0]
+    assert len(full.stdout) > 100_000
+    assert len(compact.stdout) < 5_000
+    assert len(compact.stdout) < len(full.stdout) * 0.05
+    assert compact_payload["compact"] is True
+    assert compact_payload["omitted_content_chars"] > 100_000
+    assert compact_result["citation"] == (
+        "[Algorithms, handout.pdf, Page 1]"
+    )
+    assert "evidence" in compact_result
+    assert "raw_text" not in compact_result
+    assert "body_text" not in compact_result
+    assert full_payload["results"][0]["raw_text"].count("precise-content") == (
+        10_000
+    )
+    assert exact_payload["total_records"] == 1
+    assert exact_payload["records"][0]["raw_text"].count("precise-content") == (
+        10_000
+    )
+
+
 def test_read_script_validation_uses_json_error_envelope(tmp_path: Path):
     result = run_script(
         "read_lectures.py",

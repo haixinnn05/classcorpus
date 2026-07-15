@@ -56,6 +56,7 @@ def test_unified_cli_indexes_searches_and_reports_course_status(tmp_path: Path):
         "negative edges",
         "--course",
         "Algorithms",
+        "--compact",
         "--json",
         data_dir=data_dir,
         cwd=unrelated,
@@ -78,6 +79,8 @@ def test_unified_cli_indexes_searches_and_reports_course_status(tmp_path: Path):
     assert search_payload["results"][0]["citation"] == (
         "[Algorithms, handout.pdf, Page 2]"
     )
+    assert search_payload["compact"] is True
+    assert "raw_text" not in search_payload["results"][0]
     assert status.returncode == 0, status.stderr
     assert status_payload["course_count"] == 1
     course_status = status_payload["courses"][0]

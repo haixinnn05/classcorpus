@@ -37,7 +37,7 @@ failures use `cache_cleanup_failed`.
 
 ```text
 python scripts/search_lectures.py QUERY [--course COURSE] \
-  [--source RELATIVE_PATH] [--ordinal N] [--limit N] --json
+  [--source RELATIVE_PATH] [--ordinal N] [--limit N] [--compact] --json
 ```
 
 Each result contains course, source file and absolute path, one-based ordinal,
@@ -54,6 +54,14 @@ that it may be stale. An indexed query with no match sets `sync_required: false`
 and may return close indexed vocabulary in `suggested_terms`. Suggestions are
 never substituted automatically; the agent or user decides whether to retry.
 
+With `--compact`, each result omits full body, notes, raw text, visual
+description, OCR text, render paths, and asset objects. It retains a bounded
+query-centered `evidence` snippet, citation, source identity, review state,
+ranking signals, and `omitted_content_chars`. The response-level
+`omitted_content_chars` reports the total content withheld from that payload.
+Use exact read retrieval for selected evidence; compact mode never truncates
+stored data.
+
 `--source` matches the source path relative to the indexed course root.
 `--ordinal` limits results to one one-based slide or page number.
 
@@ -64,13 +72,17 @@ Argument-validation failures also use the JSON error envelope and exit 1 when
 
 ```text
 python scripts/read_lectures.py --course COURSE \
-  [--source RELATIVE_PATH] [--cursor CURSOR] [--limit N] --json
+  [--source RELATIVE_PATH] [--ordinal N] \
+  [--cursor CURSOR] [--limit N] --json
 ```
 
 Use this command for whole lectures, ranges, and all/every/full-scope study
 artifacts. Records are ordered by source path and one-based ordinal. The
 response contains `records`, `total_records`, `returned_records`, `has_more`,
 opaque `next_cursor`, scope-wide `review_needed`, and `warnings`.
+
+`--source` plus `--ordinal` returns one exact full record for compact-search
+drill-down. An ordinal cannot be combined with a cursor.
 
 Each record includes source status/error, title, body, notes, complete
 `raw_text`, extraction status/reasons, native character count, visual

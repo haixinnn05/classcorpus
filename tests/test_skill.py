@@ -162,3 +162,9 @@ def test_skill_and_public_docs_define_unified_cli(skill_text: str):
 def test_skill_keeps_typo_suggestions_explicit(skill_text: str):
     assert "suggested_terms" in skill_text
     assert "substitute a suggestion silently" in skill_text
+
+
+def test_skill_uses_token_efficient_two_stage_retrieval(skill_text: str):
+    assert "--compact" in skill_text
+    assert "--ordinal NUMBER" in skill_text
+    assert "Do not fetch full content for every compact candidate" in skill_text

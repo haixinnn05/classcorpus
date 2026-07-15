@@ -47,19 +47,28 @@ CLI is documented in `references/cli.md`.
 
    ```text
    python "$SKILL_DIR/scripts/search_lectures.py" \
-     "QUERY" --course "COURSE" --limit 8 --json
+     "QUERY" --course "COURSE" --limit 8 --compact --json
    ```
 
-3. Inspect focused-search evidence. Search again with narrower or alternative
-   terms when results are weak, incomplete, or conflicting. Never load every
-   source file merely to answer one question.
+3. Inspect compact candidate evidence. Search again with narrower or
+   alternative terms when results are weak, incomplete, or conflicting. Never
+   load every source file merely to answer one question.
 
    When search returns no records, inspect `suggested_terms`. Retry a close
    indexed term only when it preserves the user's intended concept; never
    substitute a suggestion silently.
 
-   For a specific lecture or slide/page, add `--source "RELATIVE/PATH.pptx"`
-   and/or `--ordinal NUMBER`.
+   Before drafting, fetch complete evidence only for the candidate records
+   actually used:
+
+   ```text
+   python "$SKILL_DIR/scripts/read_lectures.py" \
+     --course "COURSE" --source "RELATIVE/PATH.pptx" \
+     --ordinal NUMBER --json
+   ```
+
+   Do not fetch full content for every compact candidate. For a new focused
+   search, add `--source` and/or `--ordinal` filters when already known.
 
    For all/every/whole lecture content, a lecture range, or any exhaustive
    artifact, do not use ranked search as coverage proof. Run:

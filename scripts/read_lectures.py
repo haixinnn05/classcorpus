@@ -14,6 +14,7 @@ def main() -> int:
     )
     parser.add_argument("--course", required=True)
     parser.add_argument("--source")
+    parser.add_argument("--ordinal", type=int)
     parser.add_argument("--cursor")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--json", action="store_true", dest="json_mode")
@@ -25,6 +26,7 @@ def main() -> int:
             database,
             course=args.course,
             source_file=args.source,
+            ordinal=args.ordinal,
             cursor=args.cursor,
             limit=args.limit,
         )

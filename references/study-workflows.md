@@ -11,10 +11,11 @@ full-slide layout evidence.
 
 ## Question Answering
 
-1. Search the user's wording.
+1. Search the user's wording with compact results.
 2. Search prerequisite or synonymous terms when evidence is thin.
-3. Answer directly and cite each course-derived claim.
-4. Separate optional general knowledge from course evidence.
+3. Fetch full content only for records selected as supporting evidence.
+4. Answer directly and cite each course-derived claim.
+5. Separate optional general knowledge from course evidence.
 
 ## Summary
 
