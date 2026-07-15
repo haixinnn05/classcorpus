@@ -166,5 +166,7 @@ def test_skill_keeps_typo_suggestions_explicit(skill_text: str):
 
 def test_skill_uses_token_efficient_two_stage_retrieval(skill_text: str):
     assert "--compact" in skill_text
+    assert "read_record.py" in skill_text
     assert "--ordinal NUMBER" in skill_text
+    assert "next_offset" in skill_text
     assert "Do not fetch full content for every compact candidate" in skill_text

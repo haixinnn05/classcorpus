@@ -59,14 +59,34 @@ description, OCR text, render paths, and asset objects. It retains a bounded
 query-centered `evidence` snippet, citation, source identity, review state,
 ranking signals, and `omitted_content_chars`. The response-level
 `omitted_content_chars` reports the total content withheld from that payload.
-Use exact read retrieval for selected evidence; compact mode never truncates
-stored data.
+Use bounded record retrieval for selected evidence; compact mode never
+truncates stored data.
 
 `--source` matches the source path relative to the indexed course root.
 `--ordinal` limits results to one one-based slide or page number.
 
 Argument-validation failures also use the JSON error envelope and exit 1 when
 `--json` is present.
+
+## Bounded Record Read
+
+```text
+python scripts/read_record.py --course COURSE \
+  --source RELATIVE_PATH --ordinal N \
+  [--field FIELD] [--offset N] [--limit N] --json
+```
+
+Use this command after compact search to retrieve one selected record without
+loading its entire contents. `field` is one of `searchable`, `raw_text`,
+`body_text`, `speaker_notes`, `visual_description`, or `ocr_text`; the default
+is `searchable`. The default chunk is 8,000 characters and the maximum is
+50,000.
+
+The response contains exact source identity, extraction status, citation,
+`text`, `total_chars`, `offset`, `returned_chars`, `has_more`, and
+`next_offset`. Pass `next_offset` back through `--offset` only when more of the
+same field is needed. Character chunks are contiguous and reconstruct the
+stored field without gaps.
 
 ## Exhaustive Read
 
@@ -81,8 +101,9 @@ artifacts. Records are ordered by source path and one-based ordinal. The
 response contains `records`, `total_records`, `returned_records`, `has_more`,
 opaque `next_cursor`, scope-wide `review_needed`, and `warnings`.
 
-`--source` plus `--ordinal` returns one exact full record for compact-search
-drill-down. An ordinal cannot be combined with a cursor.
+`--source` plus `--ordinal` returns one exact full record when complete
+structured metadata is explicitly needed. An ordinal cannot be combined with
+a cursor.
 
 Each record includes source status/error, title, body, notes, complete
 `raw_text`, extraction status/reasons, native character count, visual

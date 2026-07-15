@@ -508,10 +508,27 @@ def test_compact_search_omits_large_content_then_exact_read_restores_it(
         data_dir=data_dir,
         cwd=tmp_path,
     )
+    bounded = run_script(
+        "read_record.py",
+        "--course",
+        "Algorithms",
+        "--source",
+        "handout.pdf",
+        "--ordinal",
+        "1",
+        "--field",
+        "raw_text",
+        "--limit",
+        "8000",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
 
     full_payload = json.loads(full.stdout)
     compact_payload = json.loads(compact.stdout)
     exact_payload = json.loads(exact.stdout)
+    bounded_payload = json.loads(bounded.stdout)
     compact_result = compact_payload["results"][0]
     assert len(full.stdout) > 100_000
     assert len(compact.stdout) < 5_000
@@ -531,6 +548,11 @@ def test_compact_search_omits_large_content_then_exact_read_restores_it(
     assert exact_payload["records"][0]["raw_text"].count("precise-content") == (
         10_000
     )
+    assert bounded.returncode == 0, bounded.stderr
+    assert len(bounded.stdout) < 10_000
+    assert bounded_payload["returned_chars"] == 8_000
+    assert bounded_payload["has_more"] is True
+    assert bounded_payload["next_offset"] == 8_000
 
 
 def test_read_script_validation_uses_json_error_envelope(tmp_path: Path):
@@ -669,6 +691,7 @@ def test_flashcard_conversion_script_preserves_citations_and_refuses_overwrite(
         ("index_lectures.py", ("--unknown", "--json")),
         ("search_lectures.py", ("--unknown", "--json")),
         ("read_lectures.py", ("--unknown", "--json")),
+        ("read_record.py", ("--unknown", "--json")),
         ("build_embeddings.py", ("--unknown", "--json")),
         ("convert_flashcards.py", ("--unknown", "--json")),
         ("review_powerpoint.py", ("--unknown", "--json")),

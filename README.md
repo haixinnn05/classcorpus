@@ -97,18 +97,20 @@ matches. A misspelling with no result returns a local "Did you mean" suggestion
 without silently changing the query.
 
 For token-efficient agent retrieval, request compact candidates and then read
-only the selected full record:
+bounded chunks from only the selected record:
 
 ```bash
 .venv/bin/classcorpus search \
   "Bellman-Ford" --course "Algorithms" --compact --json
-.venv/bin/python scripts/read_lectures.py \
-  --course "Algorithms" --source "handout.pdf" --ordinal 3 --json
+.venv/bin/python scripts/read_record.py \
+  --course "Algorithms" --source "handout.pdf" --ordinal 3 \
+  --field searchable --json
 ```
 
 Compact mode keeps citations, warnings, ranking signals, and a bounded evidence
 snippet while omitting complete record bodies from the candidate payload.
-Stored lecture evidence is never truncated.
+Follow `next_offset` with `--offset` only when more evidence is needed. Stored
+lecture evidence is never truncated.
 
 Inspect course health and recommended next actions:
 

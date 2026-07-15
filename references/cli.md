@@ -25,10 +25,11 @@ matches, close indexed vocabulary is shown as a suggestion without changing or
 rerunning the user's query automatically.
 
 Use `--compact --json` for agent or automation candidate selection. It returns
-bounded evidence and metadata instead of complete record bodies. Fetch only
-the chosen records with `read_lectures.py --source PATH --ordinal N --json`.
-This two-stage flow keeps full evidence available while avoiding repeated
-large-record payloads.
+bounded evidence and metadata instead of complete record bodies. Fetch a
+bounded chunk from only the chosen record with
+`read_record.py --source PATH --ordinal N --json`, then follow `next_offset`
+only when more text is needed. This two-stage flow keeps full evidence
+available while avoiding repeated large-record payloads.
 
 ## Status
 

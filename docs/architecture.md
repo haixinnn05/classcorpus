@@ -18,8 +18,8 @@ stable machine-readable interfaces for agents.
    and optional local embeddings from sentence-transformers, FastEmbed, or a
    dependency-free hashing backend.
 4. `search_lectures.py` returns a ranked subset for focused questions.
-5. Compact search selects candidates with bounded evidence; exact
-   source/ordinal reads retrieve full content only for records used.
+5. Compact search selects candidates with bounded evidence; `read_record.py`
+   retrieves contiguous text chunks only from records actually used.
 6. `read_lectures.py` cursor-paginates every record for exhaustive requests.
 7. `review_powerpoint.py` inventories layout-dependent records and required
    review actions.

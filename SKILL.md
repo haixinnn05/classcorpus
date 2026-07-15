@@ -58,14 +58,17 @@ CLI is documented in `references/cli.md`.
    indexed term only when it preserves the user's intended concept; never
    substitute a suggestion silently.
 
-   Before drafting, fetch complete evidence only for the candidate records
+   Before drafting, fetch bounded evidence only for the candidate records
    actually used:
 
    ```text
-   python "$SKILL_DIR/scripts/read_lectures.py" \
+   python "$SKILL_DIR/scripts/read_record.py" \
      --course "COURSE" --source "RELATIVE/PATH.pptx" \
-     --ordinal NUMBER --json
+     --ordinal NUMBER --field searchable --json
    ```
+
+   Continue with `--offset NUMBER` from `next_offset` only when the answer
+   needs more of that record.
 
    Do not fetch full content for every compact candidate. For a new focused
    search, add `--source` and/or `--ordinal` filters when already known.

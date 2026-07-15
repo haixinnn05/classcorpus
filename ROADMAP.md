@@ -19,6 +19,7 @@ All currently planned near-term milestones are complete.
 - Added a unified CLI with course status and environment diagnostics
 - Added explainable lexical reranking and local typo suggestions
 - Added compact candidate search with exact full-record drill-down
+- Added bounded, resumable evidence reads for oversized records
 
 ## Later
 

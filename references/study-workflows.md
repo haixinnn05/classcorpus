@@ -13,7 +13,8 @@ full-slide layout evidence.
 
 1. Search the user's wording with compact results.
 2. Search prerequisite or synonymous terms when evidence is thin.
-3. Fetch full content only for records selected as supporting evidence.
+3. Fetch bounded chunks only for records selected as supporting evidence.
+   Follow `next_offset` only when the answer needs more of that record.
 4. Answer directly and cite each course-derived claim.
 5. Separate optional general knowledge from course evidence.
 
