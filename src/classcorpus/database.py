@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from classcorpus.models import SlideRecord, SourceFingerprint
+from classcorpus.models import SlideRecord, SourceFingerprint, VisualAsset
 from classcorpus.paths import data_root, database_path
 
 SCHEMA = """
@@ -50,6 +50,21 @@ CREATE TABLE IF NOT EXISTS slides (
     render_path TEXT,
     vision_status TEXT NOT NULL DEFAULT 'pending',
     UNIQUE(source_file_id, ordinal)
+);
+
+CREATE TABLE IF NOT EXISTS visual_assets (
+    id INTEGER PRIMARY KEY,
+    slide_id INTEGER NOT NULL REFERENCES slides(id) ON DELETE CASCADE,
+    asset_index INTEGER NOT NULL CHECK(asset_index >= 0),
+    path TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    shape_name TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    left INTEGER NOT NULL,
+    top INTEGER NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    UNIQUE(slide_id, asset_index)
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS slide_fts USING fts5(
@@ -278,6 +293,28 @@ class Database:
                     ),
                 )
                 slide_id = cursor.lastrowid
+                for asset_index, asset in enumerate(slide.visual_assets):
+                    self.connection.execute(
+                        """
+                        INSERT INTO visual_assets(
+                            slide_id, asset_index, path, kind, shape_name,
+                            content_type, left, top, width, height
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            slide_id,
+                            asset_index,
+                            asset.path,
+                            asset.kind,
+                            asset.shape_name,
+                            asset.content_type,
+                            asset.left,
+                            asset.top,
+                            asset.width,
+                            asset.height,
+                        ),
+                    )
                 self.connection.execute(
                     """
                     INSERT INTO slide_fts(
@@ -414,13 +451,20 @@ class Database:
             return ()
         warnings: list[dict[str, str]] = []
         try:
-            rows = self.connection.execute(
+            render_rows = self.connection.execute(
                 "SELECT render_path FROM slides WHERE render_path IS NOT NULL"
             ).fetchall()
             referenced = {
                 Path(row["render_path"]).expanduser().resolve().parent
-                for row in rows
+                for row in render_rows
             }
+            asset_rows = self.connection.execute(
+                "SELECT path FROM visual_assets"
+            ).fetchall()
+            referenced.update(
+                _asset_generation_directory(Path(row["path"]))
+                for row in asset_rows
+            )
         except (OSError, TypeError, ValueError, sqlite3.Error) as error:
             return (
                 {
@@ -488,6 +532,10 @@ class Database:
                 "SELECT render_path FROM slides WHERE render_path IS NOT NULL"
             )
         }
+        referenced.update(
+            _asset_generation_directory(Path(row["path"]))
+            for row in self.connection.execute("SELECT path FROM visual_assets")
+        )
         cleaned = 0
         for row in rows:
             directory = _validated_render_directory(Path(row["path"]))
@@ -502,7 +550,7 @@ class Database:
         return cleaned
 
     def _source_render_directories(self, source_file_id: int) -> set[Path]:
-        return {
+        directories = {
             Path(row["render_path"]).expanduser().resolve().parent
             for row in self.connection.execute(
                 """
@@ -512,6 +560,32 @@ class Database:
                 (source_file_id,),
             )
         }
+        directories.update(
+            _asset_generation_directory(Path(row["path"]))
+            for row in self.connection.execute(
+                """
+                SELECT visual_assets.path
+                FROM visual_assets
+                JOIN slides ON slides.id = visual_assets.slide_id
+                WHERE slides.source_file_id = ?
+                """,
+                (source_file_id,),
+            )
+        )
+        return directories
+
+    def visual_assets_for_slide(self, slide_id: int) -> tuple[VisualAsset, ...]:
+        rows = self.connection.execute(
+            """
+            SELECT path, kind, shape_name, content_type,
+                   left, top, width, height
+            FROM visual_assets
+            WHERE slide_id = ?
+            ORDER BY asset_index
+            """,
+            (slide_id,),
+        ).fetchall()
+        return tuple(VisualAsset(**dict(row)) for row in rows)
 
     def _migrate_slides(self) -> None:
         columns = {
@@ -634,7 +708,7 @@ def remove_course_data(
     if not confirmed:
         return False
 
-    rows = database.connection.execute(
+    render_rows = database.connection.execute(
         """
         SELECT slides.render_path
         FROM slides
@@ -645,9 +719,24 @@ def remove_course_data(
         (course_name,),
     ).fetchall()
     render_directories: set[Path] = set()
-    for row in rows:
+    for row in render_rows:
         render_path = Path(row["render_path"]).expanduser().resolve()
         render_directories.add(_validated_render_directory(render_path.parent))
+    asset_rows = database.connection.execute(
+        """
+        SELECT visual_assets.path
+        FROM visual_assets
+        JOIN slides ON slides.id = visual_assets.slide_id
+        JOIN source_files ON source_files.id = slides.source_file_id
+        JOIN courses ON courses.id = source_files.course_id
+        WHERE courses.name = ?
+        """,
+        (course_name,),
+    ).fetchall()
+    render_directories.update(
+        _validated_render_directory(_asset_generation_directory(Path(row["path"])))
+        for row in asset_rows
+    )
 
     other_references = {
         Path(row["render_path"]).expanduser().resolve().parent
@@ -662,6 +751,20 @@ def remove_course_data(
             (course_name,),
         )
     }
+    other_references.update(
+        _asset_generation_directory(Path(row["path"]))
+        for row in database.connection.execute(
+            """
+            SELECT visual_assets.path
+            FROM visual_assets
+            JOIN slides ON slides.id = visual_assets.slide_id
+            JOIN source_files ON source_files.id = slides.source_file_id
+            JOIN courses ON courses.id = source_files.course_id
+            WHERE courses.name != ?
+            """,
+            (course_name,),
+        )
+    )
     removed = database.schedule_course_removal(
         course_name,
         render_directories - other_references,
@@ -679,3 +782,8 @@ def _validated_render_directory(directory: Path) -> Path:
             f"{resolved}"
         )
     return resolved
+
+
+def _asset_generation_directory(path: Path) -> Path:
+    resolved = path.expanduser().resolve()
+    return resolved.parent.parent

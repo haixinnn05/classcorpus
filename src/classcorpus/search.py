@@ -7,7 +7,7 @@ from typing import Literal
 
 from classcorpus.database import Database
 from classcorpus.embeddings import Encoder, semantic_ranking
-from classcorpus.models import ExtractionStatus
+from classcorpus.models import ExtractionStatus, VisualAsset
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +33,7 @@ class SearchResult:
     vision_status: str
     snippet: str
     score: float
+    visual_assets: tuple[VisualAsset, ...] = ()
 
 
 def search(
@@ -100,7 +101,7 @@ def search(
         """,
         parameters,
     ).fetchall()
-    fts_results = [_row_to_search_result(row) for row in rows]
+    fts_results = [_row_to_search_result(database, row) for row in rows]
     if encoder is None:
         return fts_results
 
@@ -150,12 +151,15 @@ def reciprocal_rank_fusion(
     return scores
 
 
-def _row_to_search_result(row) -> SearchResult:
+def _row_to_search_result(database: Database, row) -> SearchResult:
     values = dict(row)
     values["extraction_reasons"] = tuple(
         json.loads(values["extraction_reasons"])
     )
     values["has_visual_content"] = bool(values["has_visual_content"])
+    values["visual_assets"] = database.visual_assets_for_slide(
+        int(values["slide_id"])
+    )
     return SearchResult(**values)
 
 
@@ -196,7 +200,7 @@ def _results_by_id(
         slide_ids,
     ).fetchall()
     return {
-        int(row["slide_id"]): _row_to_search_result(row)
+        int(row["slide_id"]): _row_to_search_result(database, row)
         for row in rows
     }
 

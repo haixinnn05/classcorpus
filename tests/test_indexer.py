@@ -34,7 +34,7 @@ def test_fingerprint_is_stable_until_content_changes(tmp_path: Path):
     changed = fingerprint(source)
 
     assert first.sha256 == second.sha256
-    assert first.parser_version == "2"
+    assert first.parser_version == "3"
     assert changed.sha256 != first.sha256
 
 
@@ -125,30 +125,23 @@ def test_fingerprint_failure_does_not_stop_other_sources(
     assert database.source_failures("Algorithms")[0]["source_file"] == "lecture-1.pdf"
 
 
-def test_missing_pptx_renderer_returns_actionable_warning(
-    course_fixture: Path,
+def test_powerpoint_without_viewable_asset_returns_pdf_export_warning(
+    tmp_path: Path,
     database: Database,
-    monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr("classcorpus.parsers.shutil.which", lambda _: None)
+    root = tmp_path / "Algorithms-No-Renderer"
+    root.mkdir()
+    make_pptx_fixture(root / "lecture.pptx", include_audit_slides=True)
 
-    report = sync_course(database, "Algorithms", course_fixture)
+    report = sync_course(database, "Algorithms", root)
 
     warning = next(
-        item for item in report.warnings if item["path"].endswith("lecture-2.pptx")
+        item
+        for item in report.warnings
+        if item["type"] == "visual-source-unavailable"
     )
-    assert warning["type"] == "renderer_unavailable"
-    assert "LibreOffice" in warning["message"]
-    generation_dirs = set(
-        (course_fixture.parent / "data" / "renders").rglob("generation-*")
-    )
-    referenced_dirs = {
-        Path(row["render_path"]).parent
-        for row in database.connection.execute(
-            "SELECT render_path FROM slides WHERE render_path IS NOT NULL"
-        )
-    }
-    assert generation_dirs == referenced_dirs
+    assert warning["ordinal"] == "3"
+    assert "PDF" in warning["message"]
 
 
 def test_removed_source_is_pruned_from_index(

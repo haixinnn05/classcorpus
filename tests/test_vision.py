@@ -6,7 +6,7 @@ from classcorpus.database import Database
 from classcorpus.indexer import sync_course
 from classcorpus.search import search
 from classcorpus.vision import get_vision_queue, store_descriptions
-from tests.fixtures.make_fixtures import make_pdf_fixture
+from tests.fixtures.make_fixtures import make_pdf_fixture, make_pptx_fixture
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def test_queue_only_returns_rendered_pending_slides(indexed_course: Database):
 
     assert len(items) == 2
     assert all(Path(item.render_path).is_file() for item in items)
-    assert [item.ordinal for item in items] == [1, 2]
+    assert [item.ordinal for item in items] == [2, 1]
 
 
 def test_storing_description_removes_item_and_updates_search(
@@ -61,3 +61,34 @@ def test_invalid_description_keeps_item_queued(indexed_course: Database):
         )
 
     assert get_vision_queue(indexed_course, "Algorithms", limit=1)[0] == item
+
+
+def test_powerpoint_queue_exposes_assets_and_unavailable_visuals(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("CLASSCORPUS_DATA_DIR", str(tmp_path / "data"))
+    root = tmp_path / "Algorithms"
+    root.mkdir()
+    make_pptx_fixture(root / "lecture.pptx", include_audit_slides=True)
+    database = Database(tmp_path / "index.sqlite3")
+    database.initialize()
+    assert sync_course(database, "Algorithms", root).indexed == 1
+
+    items = get_vision_queue(database, "Algorithms", limit=20)
+    picture = next(item for item in items if item.ordinal == 1)
+    chart = next(item for item in items if item.ordinal == 3)
+
+    assert picture.render_path is None
+    assert len(picture.asset_paths) == 3
+    assert all(Path(path).is_file() for path in picture.asset_paths)
+    assert picture.warning is None
+    assert chart.render_path is None
+    assert chart.asset_paths == ()
+    assert chart.warning["type"] == "visual-source-unavailable"
+
+    with pytest.raises(ValueError, match="no viewable render or asset"):
+        store_descriptions(
+            database,
+            [{"slide_id": chart.slide_id, "description": "A chart description."}],
+        )

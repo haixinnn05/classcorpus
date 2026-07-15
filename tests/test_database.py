@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 
 from classcorpus.database import Database
-from classcorpus.models import SlideRecord, SourceFingerprint
+from classcorpus.models import SlideRecord, SourceFingerprint, VisualAsset
 
 
 def test_database_defaults_to_shared_database_path(monkeypatch, tmp_path):
@@ -48,6 +48,9 @@ def test_schema_enables_fts(tmp_path):
 
 def test_replace_source_preserves_lossless_extraction_fields(tmp_path):
     raw = "Title\n\n  indented detail\n" + ("x" * 120_000) + "\n"
+    asset_path = tmp_path / "data" / "renders" / "course" / "asset.png"
+    asset_path.parent.mkdir(parents=True)
+    asset_path.write_bytes(b"exact-image")
     db = Database(tmp_path / "db.sqlite3")
     db.initialize()
     course = db.upsert_course("Algorithms", tmp_path / "lectures")
@@ -62,6 +65,18 @@ def test_replace_source_preserves_lossless_extraction_fields(tmp_path):
         extraction_reasons=("embedded-image",),
         native_text_chars=len(raw),
         has_visual_content=True,
+        visual_assets=(
+            VisualAsset(
+                path=str(asset_path),
+                kind="image",
+                shape_name="Picture 1",
+                content_type="image/png",
+                left=1,
+                top=2,
+                width=3,
+                height=4,
+            ),
+        ),
     )
 
     db.replace_source(
@@ -78,6 +93,16 @@ def test_replace_source_preserves_lossless_extraction_fields(tmp_path):
     assert json.loads(row["extraction_reasons"]) == ["embedded-image"]
     assert row["native_text_chars"] == len(raw)
     assert row["has_visual_content"] == 1
+    asset = db.connection.execute("SELECT * FROM visual_assets").fetchone()
+    assert asset is not None
+    assert asset["path"] == str(asset_path)
+    assert asset["shape_name"] == "Picture 1"
+    assert (asset["left"], asset["top"], asset["width"], asset["height"]) == (
+        1,
+        2,
+        3,
+        4,
+    )
 
 
 def test_initialize_migrates_legacy_slides_for_review(tmp_path):

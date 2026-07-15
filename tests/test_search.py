@@ -93,6 +93,20 @@ def test_search_finds_speaker_notes_and_table_text(indexed_course: Database):
     assert table[0].ordinal == 2
 
 
+def test_search_returns_powerpoint_visual_assets(indexed_course: Database):
+    result = search(
+        indexed_course,
+        "Recurrences",
+        course="Algorithms",
+        source_file="Lecture08.pptx",
+        limit=1,
+    )[0]
+
+    assert len(result.visual_assets) == 3
+    assert all(asset.kind == "image" for asset in result.visual_assets)
+    assert all(Path(asset.path).is_file() for asset in result.visual_assets)
+
+
 def test_search_filters_by_source_file_and_ordinal(indexed_course: Database):
     results = search(
         indexed_course,

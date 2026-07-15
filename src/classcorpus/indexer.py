@@ -9,7 +9,7 @@ from classcorpus.models import SourceFingerprint
 from classcorpus.parsers import parse_source
 from classcorpus.paths import create_render_generation
 
-PARSER_VERSION = "2"
+PARSER_VERSION = "3"
 SUPPORTED_SUFFIXES = {".pdf", ".pptx"}
 
 
@@ -92,22 +92,6 @@ def sync_course(
                 source,
                 render_dir,
             )
-            if (
-                source.suffix.lower() == ".pptx"
-                and slides
-                and not any(slide.render_path for slide in slides)
-            ):
-                source_warnings.append(
-                    {
-                        "path": str(source),
-                        "type": "renderer_unavailable",
-                        "message": (
-                            "PowerPoint text was indexed without slide images. "
-                            "Install LibreOffice and ensure 'soffice' is on PATH "
-                            "to enable visual analysis."
-                        ),
-                    }
-                )
             source_records_review_needed = 0
             for slide in slides:
                 if slide.extraction_status == "review-needed":
@@ -125,7 +109,27 @@ def sync_course(
                             ),
                         }
                     )
-            if not any(slide.render_path for slide in slides):
+                    if (
+                        source.suffix.lower() == ".pptx"
+                        and slide.render_path is None
+                        and not slide.visual_assets
+                    ):
+                        source_warnings.append(
+                            {
+                                "path": str(source),
+                                "ordinal": str(slide.ordinal),
+                                "type": "visual-source-unavailable",
+                                "message": (
+                                    "PowerPoint layout was not rendered. Export "
+                                    "the lecture to PDF for pixel-accurate "
+                                    "visual review."
+                                ),
+                            }
+                        )
+            if not any(
+                slide.render_path or slide.visual_assets
+                for slide in slides
+            ):
                 source_warnings.extend(
                     database.cleanup_render_directories({render_dir})
                 )
