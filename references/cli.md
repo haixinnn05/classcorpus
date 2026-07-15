@@ -39,6 +39,13 @@ Fetch a bounded chunk from only the chosen record with
 only when more text is needed. This two-stage flow keeps full evidence
 available while avoiding repeated large-record payloads.
 
+For a narrow fact, term, or named-concept lookup, agents may begin with
+`--limit 3 --budget-tokens 600` and read the selected record with
+`--limit 1200`. Use the balanced defaults for ambiguous, comparative, or
+multi-concept questions, and fall back to them when ranking signals are weak
+or the first read is insufficient. The published synthetic benchmark requires
+this adaptive first pass to save at least 25% with unchanged retrieval quality.
+
 ## Read
 
 `read` exposes the bounded record reader through the installed CLI. It returns

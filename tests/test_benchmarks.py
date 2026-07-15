@@ -21,3 +21,12 @@ def test_extraction_and_retrieval_benchmark_passes(tmp_path: Path):
     assert result["retrieval"]["mean_reciprocal_rank"] == 1.0
     assert result["extraction"]["failures"] == []
     assert result["retrieval"]["failures"] == []
+    efficiency = result["token_efficiency"]
+    assert efficiency["passed"] is True
+    assert efficiency["focused_cases"] == 30
+    assert efficiency["workflows"]["adaptive"]["recall"] == 1.0
+    assert efficiency["workflows"]["adaptive"]["top_1_accuracy"] == 1.0
+    assert efficiency["workflows"]["adaptive"]["mean_reciprocal_rank"] == 1.0
+    assert efficiency["reductions"]["adaptive_vs_standard"] >= 0.25
+    assert efficiency["reductions"]["adaptive_vs_full"] >= 0.70
+    assert efficiency["failures"] == []

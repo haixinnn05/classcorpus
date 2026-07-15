@@ -43,6 +43,12 @@ If missing, follow the README installation steps. Diagnose with
    `--full` only when complete search records are explicitly necessary.
    Check ranking signals, warnings, and `suggested_terms`; never substitute a suggestion silently.
 
+   For a narrow lookup with one specific fact, term, or named concept, start
+   with `--limit 3 --budget-tokens 600`, then read the top record with
+   `--limit 1200`. Keep the defaults for ambiguous, comparative, or
+   multi-concept questions. Retry with the defaults when ranking is weak,
+   warnings matter, or the first read lacks enough evidence.
+
 3. Read only selected evidence:
 
    ```text

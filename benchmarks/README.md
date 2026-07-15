@@ -1,9 +1,9 @@
 # ClassCorpus Benchmarks
 
 ClassCorpus publishes a deterministic, redistributable benchmark for native
-lecture extraction and baseline SQLite FTS5 retrieval. The corpus is generated
-from code, contains no private course material, and requires no network access
-or model download.
+lecture extraction, baseline SQLite FTS5 retrieval, and end-to-end agent
+context efficiency. The corpus is generated from code, contains no private
+course material, and requires no network access or model download.
 
 ## Run
 
@@ -30,7 +30,7 @@ Generate only the source corpus with:
 
 ## Corpus
 
-Version 2 contains:
+Version 3 contains:
 
 - A two-page PDF with very long native text and a mixed text/image page.
 - A six-slide PPTX covering nested groups, notes, tables, repeated embedded
@@ -38,6 +38,8 @@ Version 2 contains:
   SmartArt, and an OLE object.
 - Markdown and plain-text distractors that repeat partial query terms. These
   prove that full multi-term coverage outranks raw repetition.
+- Thirty generated Markdown records with shared course vocabulary and unique
+  target markers for focused token-efficiency queries.
 
 [`manifest.json`](manifest.json) is the benchmark contract. It records source
 and record counts, exact extraction statuses/reasons, and expected retrieval
@@ -51,6 +53,15 @@ The runner reports:
 - `recall_at_5`: the fraction of queries whose expected record appears in the
   first five FTS results.
 - `mean_reciprocal_rank`: the mean inverse rank of each expected record.
+- Adaptive, standard, and full retrieval recall, rank quality, median, p95,
+  and aggregate estimated context tokens.
+- Adaptive reductions versus standard and full retrieval.
+
+The adaptive workflow uses three candidates, a 600-token search budget, and a
+1,200-character selected read. It passes only with complete retrieval,
+every target ranked first, unchanged rank quality, at least 25% savings versus
+the balanced standard workflow, at least 70% savings versus full search,
+median context at or below 2,500 estimated tokens, and p95 at or below 4,000.
 
 The benchmark intentionally excludes wall-clock thresholds. Runtime varies by
 platform and is not a reliable correctness signal. It also does not claim to

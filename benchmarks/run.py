@@ -11,6 +11,7 @@ from classcorpus.database import Database
 from classcorpus.indexer import sync_course
 from classcorpus.search import search
 
+from benchmarks.efficiency import run_token_efficiency_benchmark
 from benchmarks.generate import generate_corpus
 
 MANIFEST_PATH = Path(__file__).with_name("manifest.json")
@@ -43,6 +44,11 @@ def _run_benchmark(work_dir: Path) -> dict[str, Any]:
         report = sync_course(database, str(manifest["course"]), corpus_dir)
         extraction = _evaluate_extraction(database, manifest)
         retrieval = _evaluate_retrieval(database, manifest)
+        token_efficiency = run_token_efficiency_benchmark(
+            database,
+            corpus_dir=work_dir / "efficiency-corpus",
+            skill_path=Path(__file__).parents[1] / "SKILL.md",
+        )
     finally:
         database.connection.close()
         if previous_data_dir is None:
@@ -50,7 +56,12 @@ def _run_benchmark(work_dir: Path) -> dict[str, Any]:
         else:
             os.environ["CLASSCORPUS_DATA_DIR"] = previous_data_dir
 
-    ok = report.failed == 0 and extraction["passed"] and retrieval["passed"]
+    ok = (
+        report.failed == 0
+        and extraction["passed"]
+        and retrieval["passed"]
+        and token_efficiency["passed"]
+    )
     return {
         "ok": ok,
         "benchmark_version": manifest["version"],
@@ -68,6 +79,7 @@ def _run_benchmark(work_dir: Path) -> dict[str, Any]:
         },
         "extraction": extraction,
         "retrieval": retrieval,
+        "token_efficiency": token_efficiency,
     }
 
 
@@ -224,9 +236,21 @@ def main() -> int:
             f"Retrieval recall@5: {retrieval['recall_at_5']:.3f}; "
             f"MRR: {retrieval['mean_reciprocal_rank']:.3f}"
         )
+        efficiency = result["token_efficiency"]
+        adaptive = efficiency["workflows"]["adaptive"]
+        reductions = efficiency["reductions"]
+        print(
+            "Adaptive context: "
+            f"median {adaptive['median_context_tokens']:.0f}; "
+            f"p95 {adaptive['p95_context_tokens']:.0f} estimated tokens"
+        )
+        print(
+            "Adaptive reduction: "
+            f"{reductions['adaptive_vs_standard']:.1%} vs standard; "
+            f"{reductions['adaptive_vs_full']:.1%} vs full"
+        )
     return 0 if result["ok"] else 1
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

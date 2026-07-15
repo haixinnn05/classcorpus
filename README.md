@@ -125,6 +125,11 @@ Follow `next_offset` with `--offset` only when more evidence is needed. Stored
 lecture evidence is never truncated. Agents can use `scripts/read_record.py`
 for the equivalent stable JSON contract.
 
+For a narrow fact or named-concept lookup, agents can start with
+`--limit 3 --budget-tokens 600`, then read the selected record with
+`--limit 1200`. Keep the balanced defaults for ambiguous, comparative, or
+multi-concept questions.
+
 Inspect course health and recommended next actions:
 
 ```bash
