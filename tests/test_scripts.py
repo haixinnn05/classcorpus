@@ -340,6 +340,73 @@ def test_search_script_accepts_source_and_ordinal_filters(tmp_path: Path):
     assert payload["results"][0]["ordinal"] == 2
 
 
+def test_read_script_returns_exhaustive_page_with_citations(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    first = run_script(
+        "read_lectures.py",
+        "--course",
+        "Algorithms",
+        "--limit",
+        "1",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    first_payload = json.loads(first.stdout)
+    second = run_script(
+        "read_lectures.py",
+        "--course",
+        "Algorithms",
+        "--cursor",
+        first_payload["next_cursor"],
+        "--limit",
+        "1",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    second_payload = json.loads(second.stdout)
+
+    assert first.returncode == 0, first.stderr
+    assert first_payload["total_records"] == 2
+    assert first_payload["returned_records"] == 1
+    assert first_payload["has_more"] is True
+    assert first_payload["records"][0]["citation"] == (
+        "[Algorithms, handout.pdf, Page 1]"
+    )
+    assert second.returncode == 0, second.stderr
+    assert second_payload["records"][0]["ordinal"] == 2
+
+
+def test_read_script_validation_uses_json_error_envelope(tmp_path: Path):
+    result = run_script(
+        "read_lectures.py",
+        "--course",
+        "Algorithms",
+        "--cursor",
+        "broken",
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert payload["error"]["type"] == "ValueError"
+
+
 def test_semantic_search_explains_missing_optional_dependencies(tmp_path: Path):
     result = run_script(
         "search_lectures.py",
@@ -361,6 +428,7 @@ def test_semantic_search_explains_missing_optional_dependencies(tmp_path: Path):
     [
         ("index_lectures.py", ("--unknown", "--json")),
         ("search_lectures.py", ("--unknown", "--json")),
+        ("read_lectures.py", ("--unknown", "--json")),
         ("build_embeddings.py", ("--unknown", "--json")),
         ("vision_queue.py", ("--unknown", "--json")),
         ("store_visual_description.py", ("--unknown", "--json")),
