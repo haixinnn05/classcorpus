@@ -61,8 +61,19 @@ def test_index_and_search_scripts_return_json_from_any_working_directory(
     assert indexed.returncode == 0, indexed.stderr
     assert json.loads(indexed.stdout)["indexed"] == 1
     assert searched.returncode == 0, searched.stderr
-    result = json.loads(searched.stdout)["results"][0]
+    payload = json.loads(searched.stdout)
+    result = payload["results"][0]
     assert result["citation"] == "[Algorithms, handout.pdf, Page 2]"
+    assert result["extraction_status"] == "review-needed"
+    assert "embedded-image" in result["extraction_reasons"]
+    warning = next(
+        item
+        for item in payload["warnings"]
+        if item["type"] == "extraction_review_needed"
+    )
+    assert warning["ordinal"] == "2"
+    assert "embedded-image" in warning["reasons"]
+    assert payload["sync_required"] is False
 
 
 def test_vision_queue_and_store_scripts_round_trip(tmp_path: Path):

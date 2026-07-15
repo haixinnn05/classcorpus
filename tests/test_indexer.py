@@ -34,7 +34,7 @@ def test_fingerprint_is_stable_until_content_changes(tmp_path: Path):
     changed = fingerprint(source)
 
     assert first.sha256 == second.sha256
-    assert first.parser_version == "1"
+    assert first.parser_version == "2"
     assert changed.sha256 != first.sha256
 
 
@@ -287,14 +287,14 @@ def test_failed_same_version_retry_preserves_previous_render_cache(
     assert source.is_file()
 
 
-def test_image_only_records_are_reported_explicitly(
+def test_sync_reports_record_completeness(
     tmp_path: Path,
     database: Database,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    root = tmp_path / "ImageOnly"
+    root = tmp_path / "MixedContent"
     root.mkdir()
-    source = root / "diagram.pdf"
+    source = root / "lecture.pdf"
     source.write_bytes(b"placeholder")
     render = tmp_path / "data" / "renders" / "diagram.png"
     render.parent.mkdir(parents=True)
@@ -305,17 +305,38 @@ def test_image_only_records_are_reported_explicitly(
             SlideRecord(
                 ordinal=1,
                 kind="page",
-                title="",
-                body_text="",
+                title="Complete text",
+                body_text="Native extraction captured this page.",
                 speaker_notes="",
+                raw_text="Complete text\nNative extraction captured this page.",
+                extraction_status="text-extracted",
+                native_text_chars=51,
+            ),
+            SlideRecord(
+                ordinal=2,
+                kind="page",
+                title="",
+                body_text="Diagram",
+                speaker_notes="",
+                raw_text="Diagram",
+                extraction_status="review-needed",
+                extraction_reasons=("low-native-text", "embedded-image"),
+                native_text_chars=7,
+                has_visual_content=True,
                 render_path=str(render),
-            )
+            ),
         ],
     )
 
-    report = sync_course(database, "ImageOnly", root)
+    report = sync_course(database, "MixedContent", root)
 
     assert report.indexed == 1
-    warning = next(item for item in report.warnings if item["type"] == "image_only")
-    assert warning["ordinal"] == "1"
-    assert "visual analysis" in warning["message"]
+    assert report.records_indexed == 2
+    assert report.records_review_needed == 1
+    warning = next(
+        item
+        for item in report.warnings
+        if item["type"] == "extraction_review_needed"
+    )
+    assert warning["ordinal"] == "2"
+    assert "embedded-image" in warning["reasons"]

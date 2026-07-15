@@ -1,3 +1,4 @@
+from array import array
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,55 @@ def test_search_returns_ranked_page_metadata(indexed_course: Database):
     assert results[0].kind == "page"
     assert Path(results[0].source_path).is_absolute()
     assert "Bellman-Ford" in results[0].body_text
+
+
+def test_search_returns_full_extraction_evidence_with_short_snippet(
+    indexed_course: Database,
+):
+    result = search(indexed_course, "precise-content", limit=1)[0]
+
+    assert len(result.raw_text) > 100_000
+    assert len(result.snippet) < len(result.raw_text)
+    assert result.extraction_status in {"text-extracted", "review-needed"}
+    assert result.native_text_chars == len(result.raw_text)
+    assert result.has_visual_content is False
+
+
+def test_semantic_only_search_returns_extraction_evidence(indexed_course: Database):
+    row = indexed_course.connection.execute(
+        """
+        SELECT slides.id
+        FROM slides
+        JOIN source_files ON source_files.id = slides.source_file_id
+        WHERE source_files.relative_path = 'handout.pdf'
+          AND slides.ordinal = 2
+        """
+    ).fetchone()
+    with indexed_course.connection:
+        indexed_course.connection.execute(
+            """
+            INSERT INTO slide_embeddings(slide_id, model_name, dimension, vector)
+            VALUES (?, 'semantic-test', 2, ?)
+            """,
+            (row["id"], array("f", [1.0, 0.0]).tobytes()),
+        )
+
+    class SemanticEncoder:
+        model_name = "semantic-test"
+
+        def encode(self, texts: list[str]) -> list[list[float]]:
+            return [[1.0, 0.0] for _ in texts]
+
+    result = search(
+        indexed_course,
+        "semantic-only",
+        limit=1,
+        encoder=SemanticEncoder(),
+    )[0]
+
+    assert result.extraction_status == "review-needed"
+    assert "embedded-image" in result.extraction_reasons
+    assert result.has_visual_content is True
 
 
 def test_search_finds_speaker_notes_and_table_text(indexed_course: Database):
@@ -107,6 +157,11 @@ def test_citation_uses_slide_or_page():
         title="Dynamic Programming",
         body_text="Memoization",
         speaker_notes="",
+        raw_text="Dynamic Programming\nMemoization",
+        extraction_status="text-extracted",
+        extraction_reasons=(),
+        native_text_chars=31,
+        has_visual_content=False,
         visual_description=None,
         render_path=None,
         vision_status="pending",
@@ -125,6 +180,11 @@ def test_citation_uses_slide_or_page():
         title="Shortest Paths",
         body_text="Bellman-Ford",
         speaker_notes="",
+        raw_text="Shortest Paths\nBellman-Ford",
+        extraction_status="text-extracted",
+        extraction_reasons=(),
+        native_text_chars=28,
+        has_visual_content=False,
         visual_description=None,
         render_path=None,
         vision_status="pending",

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, replace
 from typing import Literal
 
 from classcorpus.database import Database
 from classcorpus.embeddings import Encoder, semantic_ranking
+from classcorpus.models import ExtractionStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +23,11 @@ class SearchResult:
     title: str
     body_text: str
     speaker_notes: str
+    raw_text: str
+    extraction_status: ExtractionStatus
+    extraction_reasons: tuple[str, ...]
+    native_text_chars: int
+    has_visual_content: bool
     visual_description: str | None
     render_path: str | None
     vision_status: str
@@ -72,6 +79,11 @@ def search(
             slides.title,
             slides.body_text,
             slides.speaker_notes,
+            slides.raw_text,
+            slides.extraction_status,
+            slides.extraction_reasons,
+            slides.native_text_chars,
+            slides.has_visual_content,
             slides.visual_description,
             slides.render_path,
             slides.vision_status,
@@ -88,7 +100,7 @@ def search(
         """,
         parameters,
     ).fetchall()
-    fts_results = [SearchResult(**dict(row)) for row in rows]
+    fts_results = [_row_to_search_result(row) for row in rows]
     if encoder is None:
         return fts_results
 
@@ -138,6 +150,15 @@ def reciprocal_rank_fusion(
     return scores
 
 
+def _row_to_search_result(row) -> SearchResult:
+    values = dict(row)
+    values["extraction_reasons"] = tuple(
+        json.loads(values["extraction_reasons"])
+    )
+    values["has_visual_content"] = bool(values["has_visual_content"])
+    return SearchResult(**values)
+
+
 def _results_by_id(
     database: Database,
     slide_ids: list[int],
@@ -157,6 +178,11 @@ def _results_by_id(
             slides.title,
             slides.body_text,
             slides.speaker_notes,
+            slides.raw_text,
+            slides.extraction_status,
+            slides.extraction_reasons,
+            slides.native_text_chars,
+            slides.has_visual_content,
             slides.visual_description,
             slides.render_path,
             slides.vision_status,
@@ -170,7 +196,7 @@ def _results_by_id(
         slide_ids,
     ).fetchall()
     return {
-        int(row["slide_id"]): SearchResult(**dict(row))
+        int(row["slide_id"]): _row_to_search_result(row)
         for row in rows
     }
 

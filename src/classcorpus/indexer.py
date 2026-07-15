@@ -9,7 +9,7 @@ from classcorpus.models import SourceFingerprint
 from classcorpus.parsers import parse_source
 from classcorpus.paths import create_render_generation
 
-PARSER_VERSION = "1"
+PARSER_VERSION = "2"
 SUPPORTED_SUFFIXES = {".pdf", ".pptx"}
 
 
@@ -18,8 +18,10 @@ class SyncReport:
     indexed: int
     skipped: int
     failed: int
+    records_indexed: int
+    records_review_needed: int
     failures: tuple[dict[str, str], ...]
-    warnings: tuple[dict[str, str], ...]
+    warnings: tuple[dict[str, object], ...]
 
 
 def fingerprint(path: Path) -> SourceFingerprint:
@@ -47,8 +49,9 @@ def sync_course(
 
     course = database.upsert_course(name, root)
     indexed = skipped = failed = 0
+    records_indexed = records_review_needed = 0
     failures: list[dict[str, str]] = []
-    warnings: list[dict[str, str]] = []
+    warnings: list[dict[str, object]] = []
 
     sources = sorted(
         path
@@ -68,7 +71,7 @@ def sync_course(
         relative_path = source.relative_to(root).as_posix()
         current_fingerprint: SourceFingerprint | None = None
         render_dir: Path | None = None
-        source_warnings: list[dict[str, str]] = []
+        source_warnings: list[dict[str, object]] = []
         try:
             current_fingerprint = fingerprint(source)
             if database.source_is_current(
@@ -105,22 +108,20 @@ def sync_course(
                         ),
                     }
                 )
+            source_records_review_needed = 0
             for slide in slides:
-                if not any(
-                    (
-                        slide.title.strip(),
-                        slide.body_text.strip(),
-                        slide.speaker_notes.strip(),
-                    )
-                ):
+                if slide.extraction_status == "review-needed":
+                    source_records_review_needed += 1
                     source_warnings.append(
                         {
                             "path": str(source),
                             "ordinal": str(slide.ordinal),
-                            "type": "image_only",
+                            "type": "extraction_review_needed",
+                            "reasons": list(slide.extraction_reasons),
                             "message": (
-                                f"{slide.kind.title()} {slide.ordinal} has no "
-                                "extractable text; use opt-in visual analysis."
+                                f"{slide.kind.title()} {slide.ordinal} may "
+                                "contain content that native extraction did "
+                                "not fully capture."
                             ),
                         }
                     )
@@ -137,6 +138,8 @@ def sync_course(
                     slides,
                 )
             )
+            records_indexed += len(slides)
+            records_review_needed += source_records_review_needed
         except Exception as error:
             if render_dir is not None:
                 warnings.extend(database.cleanup_render_directories({render_dir}))
@@ -172,6 +175,8 @@ def sync_course(
         indexed=indexed,
         skipped=skipped,
         failed=failed,
+        records_indexed=records_indexed,
+        records_review_needed=records_review_needed,
         failures=tuple(failures),
         warnings=tuple(warnings),
     )

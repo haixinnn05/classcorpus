@@ -47,6 +47,20 @@ def main() -> int:
         ]
         health = database.source_health(args.course)
         source_warnings = list(database.source_failures(args.course))
+        source_warnings.extend(
+            {
+                "type": "extraction_review_needed",
+                "course": result.course,
+                "source_file": result.source_file,
+                "ordinal": str(result.ordinal),
+                "reasons": list(result.extraction_reasons),
+                "message": (
+                    "Returned evidence may have incomplete native extraction."
+                ),
+            }
+            for result in results
+            if result.extraction_status == "review-needed"
+        )
         sync_required = health.total == 0 or health.failed > 0
         response = {
             "ok": True,
