@@ -1,5 +1,6 @@
 // Version-control internals and machine-local generated files.
 (?d).git
+(?d).stfolder
 (?d).worktrees
 (?d).superpowers
 (?d).venv
