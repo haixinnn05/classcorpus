@@ -27,6 +27,11 @@ full-slide layout evidence.
 - Format display equations as mathematics, not monospace programming code.
   Use fenced `math` blocks for PDF study guides so fractions, Greek symbols,
   subscripts, superscripts, vectors, and angle notation render naturally.
+  Prefer LaTeX `bmatrix`, `pmatrix`, or `vmatrix` environments for matrices.
+  The renderer also converts compact `[[...], [...]]` matrices and transposed
+  `[... ]^T` vectors into stacked notation.
+  Standalone equations are detected automatically; use `$...$` for inline
+  notation when an equation appears inside prose.
 - Preserve the taught order when source order is meaningful.
 - Include a short source list with slide/page citations.
 - State whether visual descriptions were available and whether any records

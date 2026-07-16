@@ -33,6 +33,14 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from classcorpus.math_notation import (
+    group_math_lines,
+    looks_like_display_math,
+    normalize_inline_math,
+    normalize_math_expression,
+    strip_display_math_delimiters,
+)
+
 PAGE_LABEL = "STUDY GUIDE"
 FOOTER_LABEL = "COURSE MATERIALS"
 
@@ -67,6 +75,12 @@ MATH_FONT = register_math_font()
 def inline_markup(text: str) -> str:
     value = escape(text)
     value = re.sub(r"`([^`]+)`", _inline_code_markup, value)
+    value = re.sub(
+        r"(?<!\$)\$([^$\n]+)\$(?!\$)",
+        _inline_code_markup,
+        value,
+    )
+    value = re.sub(r"\\\((.+?)\\\)", _inline_code_markup, value)
     value = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", value)
     return value
 
@@ -88,18 +102,30 @@ def _inline_code_markup(match: re.Match[str]) -> str:
                 "&gt;",
             )
         )
+        or "\\" in value
+        or any(
+            re.search(rf"(?<![A-Za-z]){name}(?![A-Za-z])", value)
+            for name in (
+                "alpha",
+                "beta",
+                "gamma",
+                "lambda",
+                "theta",
+                "sigma",
+            )
+        )
         or bool(re.search(r"\d", value) and re.search(r"[A-Za-z/]", value))
         or bool(re.fullmatch(r"[A-Za-z]", value))
     )
     if not looks_mathematical:
         return f'<font name="Courier">{value}</font>'
-    value = value.replace("Delta", "Δ").replace("theta", "θ")
-    value = value.replace(" degrees", "°")
-    value = re.sub(r"sqrt\(([^)]+)\)", r"√(\1)", value)
+    value = normalize_inline_math(value)
+    value = re.sub(r"\^\{([^}]+)\}", r"<super>\1</super>", value)
     value = re.sub(r"\^\(([^)]+)\)", r"<super>\1</super>", value)
     value = re.sub(r"\^([+-]?[0-9]+)", r"<super>\1</super>", value)
+    value = re.sub(r"_\{([^}]+)\}", r"<sub>\1</sub>", value)
     value = re.sub(r"_([A-Za-z0-9]+)", r"<sub>\1</sub>", value)
-    return value
+    return f'<font name="{MATH_FONT}">{value}</font>'
 
 
 def styles() -> dict[str, ParagraphStyle]:
@@ -312,20 +338,25 @@ def math_markup(text: str) -> str:
 
 def math_block(lines: list[str], st: dict[str, ParagraphStyle]):
     rows = []
-    for line in lines:
+    for line in group_math_lines(lines):
         if not line.strip():
             rows.append([Spacer(1, 3)])
             continue
-        digest = hashlib.sha256(line.encode("utf-8")).hexdigest()[:16]
-        path = MATH_ASSET_DIR / f"{digest}.png"
-        math_to_image(
-            f"${line.strip()}$",
-            path,
-            dpi=220,
-            format="png",
-            prop=FontProperties(size=12.5),
-            color="#183B56",
-        )
+        try:
+            expression = normalize_math_expression(line)
+            digest = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:16]
+            path = MATH_ASSET_DIR / f"{digest}.png"
+            math_to_image(
+                f"${expression}$",
+                path,
+                dpi=220,
+                format="png",
+                prop=FontProperties(size=12.5),
+                color="#183B56",
+            )
+        except ValueError:
+            rows.append([Paragraph(math_markup(line), st["math"])])
+            continue
         with PillowImage.open(path).convert("RGBA") as rendered:
             pixel_data = getattr(
                 rendered,
@@ -418,6 +449,7 @@ def markdown_story(text: str, st: dict[str, ParagraphStyle]) -> list:
     code_language = ""
     table_lines: list[str] = []
     in_code = False
+    math_fence_end = ""
 
     def flush_all() -> None:
         nonlocal table_lines
@@ -456,6 +488,24 @@ def markdown_story(text: str, st: dict[str, ParagraphStyle]) -> list:
 
     for raw_line in text.splitlines():
         line = raw_line.rstrip()
+        stripped = line.strip()
+        if not in_code and stripped in {"$$", r"\["}:
+            flush_all()
+            code_language = "math"
+            math_fence_end = "$$" if stripped == "$$" else r"\]"
+            in_code = True
+            continue
+        if in_code and math_fence_end and stripped == math_fence_end:
+            story.append(math_block(code_lines, st))
+            story.append(Spacer(1, 8))
+            code_lines.clear()
+            code_language = ""
+            math_fence_end = ""
+            in_code = False
+            continue
+        if in_code and math_fence_end:
+            code_lines.append(line)
+            continue
         if line.startswith("```"):
             if in_code:
                 if code_language == "math":
@@ -465,10 +515,12 @@ def markdown_story(text: str, st: dict[str, ParagraphStyle]) -> list:
                     story.append(Preformatted("\n".join(code_lines), st["code"]))
                 code_lines.clear()
                 code_language = ""
+                math_fence_end = ""
                 in_code = False
             else:
                 flush_all()
                 code_language = line[3:].strip()
+                math_fence_end = ""
                 in_code = True
             continue
         if in_code:
@@ -494,6 +546,13 @@ def markdown_story(text: str, st: dict[str, ParagraphStyle]) -> list:
         if line.startswith("### "):
             flush_all()
             story.append(Paragraph(inline_markup(line[4:]), st["h2"]))
+            continue
+        if looks_like_display_math(line):
+            flush_all()
+            story.append(
+                math_block([strip_display_math_delimiters(line)], st)
+            )
+            story.append(Spacer(1, 8))
             continue
         unordered = re.match(r"^- (.+)$", line)
         ordered = re.match(r"^\d+\. (.+)$", line)

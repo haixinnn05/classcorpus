@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Automatically typeset standalone equations and inline math in PDF study
+  guides, including stacked compact/LaTeX matrices, column vectors,
+  determinant bars, fractions, Greek symbols, and common named functions.
+
 ## 0.4.0 - 2026-07-15
 
 ### Added

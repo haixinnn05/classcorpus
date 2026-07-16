@@ -105,8 +105,9 @@ save cited JSON first, then create the default interactive deck with
 Use `convert_flashcards.py` only for requested CSV/TSV exports. Never pass
 `--overwrite` without explicit permission.
 
-For Markdown or PDF guides, write equations in fenced `math` blocks.
-Never present equations as programming code. Render with
+For PDF guides, prefer fenced `math` blocks; the renderer also detects
+equations, matrices, and vectors. Never present equations as programming code.
+Render with
 `scripts/render_study_guide.py SOURCE.md OUTPUT.pdf` and visually inspect the
 PDF.
 
