@@ -7,6 +7,11 @@ local lecture materials.
 **ClassCorpus is an Agent Skill, not an application.** It has no persistent web
 app, custom chatbot, hosted backend, account, telemetry, or required model API.
 
+**Keep course files where they already are.** Students do not upload or drop
+slides into the agent, ClassCorpus repository, or skill folder. Point
+ClassCorpus at any folder on the device, and it reads supported files without
+modifying the originals.
+
 ## What It Solves
 
 Index a semester of PDF and PowerPoint lectures once. The active agent can then
@@ -29,6 +34,29 @@ ClassCorpus provides:
 - Self-contained interactive flashcard decks that work offline
 - Optional polished PDF study guides with human-readable math notation
 
+## See It In Action
+
+### Interactive Flashcards
+
+Self-contained decks include topic filters, reveal controls, review tracking,
+keyboard navigation, and exact source citations.
+
+<p align="center">
+  <img src="docs/assets/flashcard-question.png" alt="ClassCorpus interactive flashcard showing a physics question" width="49%">
+  <img src="docs/assets/flashcard-deck.png" alt="ClassCorpus interactive flashcard with its answer and exact source citation revealed" width="49%">
+</p>
+
+### Cited PDF Study Guides
+
+Printable guides render vectors, derivatives, integrals, fractions, and
+exponents as readable mathematical notation, then connect practice questions
+and answer keys back to the source lectures.
+
+<p align="center">
+  <img src="docs/assets/study-guide-equations.png" alt="ClassCorpus PDF study guide formula sheet with typeset physics equations and citations" width="49%">
+  <img src="docs/assets/study-guide-practice.png" alt="ClassCorpus PDF study guide practice questions and cited answer key" width="46%">
+</p>
+
 ## Requirements
 
 - Python 3.11 or newer
@@ -44,7 +72,9 @@ pixel-accurate full-slide evidence is required.
 
 ## Install As A Skill
 
-Clone or place this repository at the skill location used by the agent:
+Clone or place the ClassCorpus repository at the skill location used by the
+agent. Only the ClassCorpus code goes here; lecture materials remain in their
+existing device folders.
 
 ```text
 Codex:       ~/.codex/skills/classcorpus/
@@ -79,7 +109,8 @@ On Windows, run `.venv\Scripts\classcorpus.exe doctor`.
 
 ## Five-Minute Start
 
-Ask the agent:
+If the lecture files already live at `/absolute/path/to/Algorithms`, ask the
+agent:
 
 > Index my Algorithms lectures at `/absolute/path/to/Algorithms`.
 
