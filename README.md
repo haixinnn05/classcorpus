@@ -70,6 +70,32 @@ charts, equations, SmartArt, OLE objects, and exact slide composition may
 require review. Export a presentation to PDF with a tool of your choice when
 pixel-accurate full-slide evidence is required.
 
+## Quick Install
+
+Paste this into an agent:
+
+> Install ClassCorpus from `https://github.com/haixinnn05/classcorpus` in your
+> Agent Skills directory. Create its `.venv`, install the package, run
+> `classcorpus doctor`, and tell me when to restart or reload the agent.
+
+Or use one command in a macOS/Linux terminal.
+
+Codex:
+
+```bash
+DEST="${CODEX_HOME:-$HOME/.codex}/skills/classcorpus"; mkdir -p "$(dirname "$DEST")" && git clone --depth 1 https://github.com/haixinnn05/classcorpus.git "$DEST" && cd "$DEST" && python3 -m venv .venv && .venv/bin/python -m pip install -e . && .venv/bin/classcorpus doctor
+```
+
+Claude Code:
+
+```bash
+DEST="$HOME/.claude/skills/classcorpus"; mkdir -p "$(dirname "$DEST")" && git clone --depth 1 https://github.com/haixinnn05/classcorpus.git "$DEST" && cd "$DEST" && python3 -m venv .venv && .venv/bin/python -m pip install -e . && .venv/bin/classcorpus doctor
+```
+
+These commands are for a first installation and stop if the destination
+already exists rather than replacing it. Restart or reload the agent after
+`doctor` passes. Windows users can follow the manual steps below.
+
 ## Install As A Skill
 
 Clone or place the ClassCorpus repository at the skill location used by the
