@@ -24,6 +24,8 @@ If missing, follow the README installation steps. Diagnose with
 
 ## Evidence Workflow
 
+Do not answer a course-specific claim before searching.
+
 1. Synchronize new or changed material:
 
    ```text
@@ -31,33 +33,29 @@ If missing, follow the README installation steps. Diagnose with
      "COURSE" "/absolute/course/path" --json
    ```
 
-2. Do not answer a course-specific claim before searching:
+2. For one fact, term, or named concept, use the deduplicated path:
+
+   ```text
+   python "$SKILL_DIR/scripts/retrieve_focused.py" \
+     "QUERY" --course "COURSE" --json
+   ```
+
+   Reuse an identical `cache_key` response within the current task. Do not
+   repeat the same query or read overlapping character ranges. Check warnings
+   and ranking signals; follow `next_offset` only when the answer needs more.
+
+3. For ambiguous, comparative, or multi-concept questions, search first:
 
    ```text
    python "$SKILL_DIR/scripts/search_lectures.py" \
      "QUERY" --course "COURSE" --json
    ```
 
-   Search is compact by default, capped at six candidates, and budgeted to
-   1,200 estimated tokens. `--compact` remains a deprecated no-op; use
-   `--full` only when complete search records are explicitly necessary.
-   Check ranking signals, warnings, and `suggested_terms`; never substitute a suggestion silently.
-
-   For a narrow lookup with one specific fact, term, or named concept, start
-   with `--limit 3 --budget-tokens 600`, then read the top record with
-   `--limit 1200`. Keep the defaults for ambiguous, comparative, or
-   multi-concept questions. Retry with the defaults when ranking is weak,
-   warnings matter, or the first read lacks enough evidence.
-
-3. Read only selected evidence:
-
-   ```text
-   python "$SKILL_DIR/scripts/read_record.py" \
-     --course "COURSE" --source "PATH" --ordinal NUMBER --json
-   ```
-
-   Follow `next_offset` only when needed.
-   Do not fetch full content for every compact candidate.
+   Search returns at most six compact candidates within 1,200 estimated
+   tokens. Read only selected evidence with `read_record.py`; never fetch full
+   content for every candidate. Never substitute a suggestion silently; use
+   `suggested_terms` only after checking with the user or retrying explicitly.
+   Use `--full` only when complete search records are explicitly necessary.
 
 4. For an all/every/whole-course or multi-lecture artifact, plan exact coverage:
 

@@ -564,6 +564,40 @@ def test_compact_search_omits_large_content_then_exact_read_restores_it(
     assert bounded_payload["next_offset"] == 8_000
 
 
+def test_focused_retrieval_script_returns_deduplicated_bundle(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_script(
+        "index_lectures.py",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_script(
+        "retrieve_focused.py",
+        "negative edges",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0, result.stderr
+    assert payload["selected"]["citation"] == (
+        "[Algorithms, handout.pdf, Page 2]"
+    )
+    assert "Bellman-Ford" in payload["selected"]["text"]
+    assert payload["cache_key"]
+    assert "snippet" not in result.stdout
+
+
 def test_outline_script_returns_compact_complete_coverage(tmp_path: Path):
     course = tmp_path / "Algorithms"
     course.mkdir()
@@ -792,6 +826,7 @@ def test_flashcard_render_script_creates_interactive_html_and_refuses_overwrite(
         ("search_lectures.py", ("--unknown", "--json")),
         ("read_lectures.py", ("--unknown", "--json")),
         ("read_record.py", ("--unknown", "--json")),
+        ("retrieve_focused.py", ("--unknown", "--json")),
         ("build_embeddings.py", ("--unknown", "--json")),
         ("convert_flashcards.py", ("--unknown", "--json")),
         ("render_flashcards.py", ("--unknown", "--json")),

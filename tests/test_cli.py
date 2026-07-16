@@ -152,6 +152,37 @@ def test_unified_cli_reads_bounded_record_chunks(tmp_path: Path):
     assert "--offset 20" in human.stdout
 
 
+def test_unified_cli_retrieves_focused_evidence(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_cli(
+        "index",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_cli(
+        "retrieve",
+        "negative edges",
+        "--course",
+        "Algorithms",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0, result.stderr
+    assert payload["selected"]["ordinal"] == 2
+    assert "Bellman-Ford" in payload["selected"]["text"]
+    assert payload["estimated_tokens"] < 700
+
+
 def test_unified_cli_read_errors_use_json_envelope(tmp_path: Path):
     result = run_cli(
         "read",

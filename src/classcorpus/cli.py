@@ -21,6 +21,11 @@ from classcorpus.payloads import (
     search_response,
 )
 from classcorpus.record_text import RECORD_TEXT_FIELDS, read_record_text
+from classcorpus.retrieval import (
+    DEFAULT_FOCUSED_LIMIT,
+    DEFAULT_FOCUSED_READ_CHARS,
+    retrieve_focused,
+)
 from classcorpus.search import search, suggest_terms
 from classcorpus.status import status_report
 
@@ -91,6 +96,32 @@ def build_parser() -> CLIArgumentParser:
     )
     _add_json_argument(search_parser)
     search_parser.set_defaults(handler=_run_search)
+
+    retrieve_parser = subparsers.add_parser(
+        "retrieve",
+        help="Retrieve one focused, deduplicated evidence bundle.",
+    )
+    retrieve_parser.add_argument("query")
+    retrieve_parser.add_argument("--course", required=True)
+    retrieve_parser.add_argument("--source")
+    retrieve_parser.add_argument("--ordinal", type=int)
+    retrieve_parser.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_FOCUSED_LIMIT,
+    )
+    retrieve_parser.add_argument(
+        "--field",
+        choices=RECORD_TEXT_FIELDS,
+        default="searchable",
+    )
+    retrieve_parser.add_argument(
+        "--read-limit",
+        type=int,
+        default=DEFAULT_FOCUSED_READ_CHARS,
+    )
+    _add_json_argument(retrieve_parser)
+    retrieve_parser.set_defaults(handler=_run_retrieve)
 
     read_parser = subparsers.add_parser(
         "read",
@@ -271,6 +302,55 @@ def _run_search(arguments: argparse.Namespace) -> int:
         print(payload["message"])
         if payload["suggested_terms"]:
             print("Did you mean: " + ", ".join(payload["suggested_terms"]))
+    return 0
+
+
+def _run_retrieve(arguments: argparse.Namespace) -> int:
+    payload = retrieve_focused(
+        _database(),
+        arguments.query,
+        course=arguments.course,
+        source_file=arguments.source,
+        ordinal=arguments.ordinal,
+        limit=arguments.limit,
+        field=arguments.field,
+        read_limit=arguments.read_limit,
+    )
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0
+
+    selected = payload["selected"]
+    if selected is None:
+        print(payload["message"])
+        if payload["suggested_terms"]:
+            print("Did you mean: " + ", ".join(payload["suggested_terms"]))
+        return 0
+
+    print(f"{selected['citation']} {selected['title'] or '(untitled)'}")
+    print(selected["text"] or f"(no text in {selected['field']})")
+    if selected["next_offset"] is not None:
+        command = shlex.join(
+            [
+                "classcorpus",
+                "read",
+                payload["course"],
+                selected["source_file"],
+                str(selected["ordinal"]),
+                "--field",
+                selected["field"],
+                "--offset",
+                str(selected["next_offset"]),
+                "--limit",
+                str(arguments.read_limit),
+            ]
+        )
+        print(f"\nContinue: {command}")
+    if payload["alternatives"]:
+        print("\nAlternatives:")
+        for candidate in payload["alternatives"]:
+            title = candidate["title"] or "(untitled)"
+            print(f"- {candidate['citation']} {title}")
     return 0
 
 

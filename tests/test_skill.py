@@ -174,14 +174,13 @@ def test_skill_keeps_typo_suggestions_explicit(skill_text: str):
     assert "substitute a suggestion silently" in skill_text
 
 
-def test_skill_uses_token_efficient_two_stage_retrieval(skill_text: str):
-    assert "--compact" in skill_text
+def test_skill_uses_token_efficient_focused_retrieval(skill_text: str):
+    assert "retrieve_focused.py" in skill_text
+    assert "cache_key" in skill_text
+    assert "overlapping character ranges" in skill_text
     assert "read_record.py" in skill_text
-    assert "--ordinal NUMBER" in skill_text
     assert "next_offset" in skill_text
-    assert "Do not fetch full content for every compact candidate" in skill_text
-    assert "--limit 3 --budget-tokens 600" in skill_text
-    assert "--limit 1200" in skill_text
+    assert "never fetch full" in skill_text
     assert "ambiguous, comparative, or" in skill_text
 
 

@@ -10,6 +10,11 @@ from classcorpus.database import Database
 from classcorpus.indexer import sync_course
 from classcorpus.payloads import estimate_tokens, search_response
 from classcorpus.record_text import read_record_text
+from classcorpus.retrieval import (
+    DEFAULT_FOCUSED_LIMIT,
+    DEFAULT_FOCUSED_READ_CHARS,
+    retrieve_focused,
+)
 from classcorpus.search import search
 
 EFFICIENCY_COURSE = "TOKEN-EFFICIENCY-101"
@@ -27,6 +32,8 @@ MIN_STANDARD_REDUCTION = 0.25
 MIN_FULL_REDUCTION = 0.70
 MAX_MEDIAN_TOKENS = 2_500
 MAX_P95_TOKENS = 4_000
+MIN_FOCUSED_REDUCTION = 0.10
+MAX_FOCUSED_MEDIAN_TOKENS = 1_900
 
 
 def generate_efficiency_corpus(
@@ -73,6 +80,11 @@ def run_token_efficiency_benchmark(
     index_report = sync_course(database, EFFICIENCY_COURSE, corpus_dir)
     skill_tokens = estimate_tokens(skill_path.read_text(encoding="utf-8"))
 
+    focused = _evaluate_focused_workflow(
+        database,
+        cases,
+        skill_tokens=skill_tokens,
+    )
     adaptive = _evaluate_workflow(
         database,
         cases,
@@ -109,8 +121,26 @@ def run_token_efficiency_benchmark(
         adaptive["aggregate_context_tokens"],
         full["aggregate_context_tokens"],
     )
+    focused_reduction = _reduction(
+        focused["aggregate_context_tokens"],
+        adaptive["aggregate_context_tokens"],
+    )
     checks = {
         "index_succeeded": index_report.failed == 0,
+        "focused_recall_complete": focused["recall"] == 1.0,
+        "focused_top_ranked": focused["top_1_accuracy"] == 1.0,
+        "focused_evidence_complete": focused["evidence_accuracy"] == 1.0,
+        "focused_rank_quality_unchanged": (
+            focused["recall"] == adaptive["recall"]
+            and focused["mean_reciprocal_rank"]
+            == adaptive["mean_reciprocal_rank"]
+        ),
+        "focused_reduction_met": (
+            focused_reduction >= MIN_FOCUSED_REDUCTION
+        ),
+        "focused_median_target_met": (
+            focused["median_context_tokens"] <= MAX_FOCUSED_MEDIAN_TOKENS
+        ),
         "adaptive_recall_complete": adaptive["recall"] == 1.0,
         "adaptive_top_ranked": adaptive["top_1_accuracy"] == 1.0,
         "rank_quality_unchanged": (
@@ -152,17 +182,23 @@ def run_token_efficiency_benchmark(
             "records_indexed": index_report.records_indexed,
         },
         "thresholds": {
+            "minimum_focused_reduction": MIN_FOCUSED_REDUCTION,
+            "maximum_focused_median_context_tokens": (
+                MAX_FOCUSED_MEDIAN_TOKENS
+            ),
             "minimum_standard_reduction": MIN_STANDARD_REDUCTION,
             "minimum_full_reduction": MIN_FULL_REDUCTION,
             "maximum_median_context_tokens": MAX_MEDIAN_TOKENS,
             "maximum_p95_context_tokens": MAX_P95_TOKENS,
         },
         "workflows": {
+            "focused": focused,
             "adaptive": adaptive,
             "standard": standard,
             "full": full,
         },
         "reductions": {
+            "focused_vs_adaptive": focused_reduction,
             "adaptive_vs_standard": standard_reduction,
             "adaptive_vs_full": full_reduction,
         },
@@ -179,6 +215,81 @@ def percentile(values: list[int], percentile_value: float) -> int:
     ordered = sorted(values)
     rank = math.ceil(percentile_value * len(ordered))
     return ordered[rank - 1]
+
+
+def _evaluate_focused_workflow(
+    database: Database,
+    cases: list[dict[str, str]],
+    *,
+    skill_tokens: int,
+) -> dict[str, Any]:
+    context_totals: list[int] = []
+    reciprocal_ranks: list[float] = []
+    successful_cases = 0
+    top_ranked_cases = 0
+    evidence_cases = 0
+    failures: list[dict[str, Any]] = []
+
+    for case in cases:
+        payload = retrieve_focused(
+            database,
+            case["query"],
+            course=EFFICIENCY_COURSE,
+        )
+        candidates = [
+            item
+            for item in [payload["selected"], *payload["alternatives"]]
+            if item is not None
+        ]
+        rank = next(
+            (
+                int(item["rank"])
+                for item in candidates
+                if item["source_file"] == case["source"]
+            ),
+            None,
+        )
+        reciprocal_ranks.append(0.0 if rank is None else 1.0 / rank)
+        successful_cases += int(rank is not None)
+        top_ranked_cases += int(rank == 1)
+        selected = payload["selected"]
+        evidence_found = bool(
+            selected is not None and case["id"] in selected["text"]
+        )
+        evidence_cases += int(evidence_found)
+        if rank != 1 or not evidence_found:
+            failures.append(
+                {
+                    "id": case["id"],
+                    "expected_source": case["source"],
+                    "rank": rank,
+                    "evidence_found": evidence_found,
+                }
+            )
+        context_totals.append(
+            skill_tokens + int(payload["estimated_tokens"])
+        )
+
+    case_count = len(cases)
+    return {
+        "limit": DEFAULT_FOCUSED_LIMIT,
+        "read_limit_chars": DEFAULT_FOCUSED_READ_CHARS,
+        "successful_cases": successful_cases,
+        "top_ranked_cases": top_ranked_cases,
+        "evidence_cases": evidence_cases,
+        "recall": successful_cases / case_count if case_count else 1.0,
+        "top_1_accuracy": top_ranked_cases / case_count if case_count else 1.0,
+        "evidence_accuracy": evidence_cases / case_count if case_count else 1.0,
+        "mean_reciprocal_rank": (
+            sum(reciprocal_ranks) / case_count if case_count else 1.0
+        ),
+        "median_context_tokens": median(context_totals) if context_totals else 0,
+        "p95_context_tokens": percentile(context_totals, 0.95)
+        if context_totals
+        else 0,
+        "aggregate_context_tokens": sum(context_totals),
+        "failures": failures,
+    }
 
 
 def _evaluate_workflow(

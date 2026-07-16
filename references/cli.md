@@ -58,6 +58,14 @@ extraction status, total and returned character counts, `has_more`, and
 `next_offset`. Human output prints the evidence and an exact continuation
 command only when more text remains.
 
+## Retrieve
+
+`classcorpus retrieve QUERY --course COURSE --json` combines three ranked
+candidates and a 1,200-character read of the top result. The selected passage
+appears once; alternatives keep citations and ranking signals without
+duplicate snippets or absolute paths. Reuse an identical `cache_key` only
+within the current task.
+
 ## Outline
 
 `outline` returns an ordered coverage ledger without full record bodies.

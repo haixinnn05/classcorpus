@@ -97,6 +97,19 @@ The response contains exact source identity, extraction status, citation,
 same field is needed. Character chunks are contiguous and reconstruct the
 stored field without gaps.
 
+## Focused Retrieval
+
+```text
+python scripts/retrieve_focused.py QUERY --course COURSE \
+  [--source PATH] [--ordinal N] [--limit N] \
+  [--field FIELD] [--read-limit N] --json
+```
+
+Returns one `selected` record with bounded text plus metadata-only
+`alternatives`. It omits duplicate snippets and absolute source paths.
+`cache_key` identifies the exact response for task-local reuse and changes when
+selected content, warnings, or candidates change.
+
 ## Coverage Outline
 
 ```text

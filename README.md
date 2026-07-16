@@ -105,9 +105,17 @@ Search ranking rewards complete query coverage, exact phrases, and title
 matches. A misspelling with no result returns a local "Did you mean" suggestion
 without silently changing the query.
 
-Search is token-efficient by default: it returns at most six compact candidates
-within a 1,200 estimated-token budget. Then read bounded chunks from only the
-selected record:
+For one fact or named concept, retrieve a selected chunk and alternatives in
+one deduplicated response:
+
+```bash
+.venv/bin/classcorpus retrieve \
+  "Bellman-Ford" --course "Algorithms" --json
+```
+
+Reuse the returned `cache_key` within the current agent task. For ambiguous or
+comparative work, search returns at most six compact candidates within a 1,200
+estimated-token budget:
 
 ```bash
 .venv/bin/classcorpus search \
@@ -126,10 +134,8 @@ Follow `next_offset` with `--offset` only when more evidence is needed. Stored
 lecture evidence is never truncated. Agents can use `scripts/read_record.py`
 for the equivalent stable JSON contract.
 
-For a narrow fact or named-concept lookup, agents can start with
-`--limit 3 --budget-tokens 600`, then read the selected record with
-`--limit 1200`. Keep the balanced defaults for ambiguous, comparative, or
-multi-concept questions.
+Use `scripts/retrieve_focused.py` for the equivalent stable agent contract.
+Keep balanced search defaults for ambiguous or multi-concept questions.
 
 Inspect course health and recommended next actions:
 

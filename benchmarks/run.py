@@ -237,8 +237,18 @@ def main() -> int:
             f"MRR: {retrieval['mean_reciprocal_rank']:.3f}"
         )
         efficiency = result["token_efficiency"]
+        focused = efficiency["workflows"]["focused"]
         adaptive = efficiency["workflows"]["adaptive"]
         reductions = efficiency["reductions"]
+        print(
+            "Focused context: "
+            f"median {focused['median_context_tokens']:.0f}; "
+            f"p95 {focused['p95_context_tokens']:.0f} estimated tokens"
+        )
+        print(
+            "Focused reduction: "
+            f"{reductions['focused_vs_adaptive']:.1%} vs adaptive"
+        )
         print(
             "Adaptive context: "
             f"median {adaptive['median_context_tokens']:.0f}; "

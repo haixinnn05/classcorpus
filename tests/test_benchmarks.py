@@ -24,6 +24,12 @@ def test_extraction_and_retrieval_benchmark_passes(tmp_path: Path):
     efficiency = result["token_efficiency"]
     assert efficiency["passed"] is True
     assert efficiency["focused_cases"] == 30
+    focused = efficiency["workflows"]["focused"]
+    assert focused["recall"] == 1.0
+    assert focused["top_1_accuracy"] == 1.0
+    assert focused["evidence_accuracy"] == 1.0
+    assert focused["median_context_tokens"] <= 1_900
+    assert efficiency["reductions"]["focused_vs_adaptive"] >= 0.10
     assert efficiency["workflows"]["adaptive"]["recall"] == 1.0
     assert efficiency["workflows"]["adaptive"]["top_1_accuracy"] == 1.0
     assert efficiency["workflows"]["adaptive"]["mean_reciprocal_rank"] == 1.0
