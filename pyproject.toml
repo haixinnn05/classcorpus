@@ -20,8 +20,11 @@ classcorpus = "classcorpus.cli:main"
 
 [project.optional-dependencies]
 dev = [
+    "matplotlib>=3.9,<4",
+    "Pillow>=10,<14",
     "PyYAML>=6,<7",
     "pytest>=8,<10",
+    "reportlab>=4,<5",
     "ruff>=0.5,<1",
 ]
 embeddings = [
