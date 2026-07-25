@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Build and smoke-test versioned Python distributions and a complete Agent
+  Skill zip, then attach them automatically to future GitHub Releases.
+
 ## 0.5.0 - 2026-07-24
 
 ### Added

@@ -97,6 +97,14 @@ These commands are for a first installation and stop if the destination
 already exists rather than replacing it. Restart or reload the agent after
 `doctor` passes. Windows users can follow the manual steps below.
 
+## Release Downloads
+
+Each [GitHub Release](https://github.com/haixinnn05/classcorpus/releases)
+includes a versioned Agent Skill zip, Python wheel, and source distribution.
+Use `classcorpus-skill-vX.Y.Z.zip` when you want a fixed, complete skill bundle;
+the wheel is for CLI/library installation. Cloning remains the simplest option
+for receiving future updates.
+
 ## Install As A Skill
 
 Clone or place the ClassCorpus repository at the skill location used by the
