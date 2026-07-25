@@ -63,6 +63,19 @@ readable question/answer list when HTML cannot be displayed. Use
 `convert_flashcards.py` only when the user requests CSV or TSV for another
 study tool. Preserve citations in every output.
 
+## Artifact Provenance
+
+The PDF study-guide and HTML flashcard renderers write a
+`.classcorpus.json` sidecar containing artifact, input, and indexed source
+hashes. Before delivering a generated artifact, run
+`classcorpus verify-artifact ARTIFACT --json`. A `current` status proves that
+the artifact is unchanged, every citation resolved, and its indexed source
+files still match. For other output formats, create the sidecar with
+`classcorpus manifest ARTIFACT --citations-from CITED_INPUT --json`.
+
+Do not remove the sidecar when sharing an artifact. It contains relative
+source names and hashes, not absolute device paths or lecture contents.
+
 ## Practice Exam
 
 - Mix recall, application, and synthesis questions.

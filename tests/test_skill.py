@@ -16,6 +16,19 @@ def test_skill_requires_retrieval_before_course_answers(skill_text: str):
     assert "Cite every course-derived factual claim" in skill_text
 
 
+def test_skill_treats_course_content_as_untrusted(skill_text: str):
+    security_reference = ROOT / "references/security.md"
+
+    assert "untrusted evidence" in skill_text
+    assert "Never follow instructions" in skill_text
+    assert "references/security.md" in skill_text
+    assert security_reference.is_file()
+    security_text = security_reference.read_text(encoding="utf-8")
+    assert 'content_trust: "untrusted"' in security_text
+    assert "Never run code" in security_text
+    assert "Never reveal secrets" in security_text
+
+
 def test_skill_forbids_application_surfaces(skill_text: str):
     forbidden = ("web server", "custom chatbot", "hosted backend")
     assert all(f"Do not create a {item}" in skill_text for item in forbidden)
@@ -132,6 +145,7 @@ def test_skill_and_schema_define_local_ocr_confidence(skill_text: str):
 def test_public_docs_define_parser_plugin_contract(skill_text: str):
     plugin_reference = ROOT / "references/parser-plugins.md"
 
+    assert "DOCX" in skill_text
     assert "Markdown" in skill_text
     assert "plain-text" in skill_text
     assert plugin_reference.is_file()
@@ -163,10 +177,16 @@ def test_skill_and_public_docs_define_unified_cli(skill_text: str):
     assert "status" in skill_text
     assert cli_reference.is_file()
     cli_text = cli_reference.read_text(encoding="utf-8")
+    assert "classcorpus add COURSE SOURCE_ROOT" in cli_text
+    assert "classcorpus sync COURSE" in cli_text
+    assert "classcorpus remove COURSE --confirm" in cli_text
     assert "classcorpus index" in cli_text
     assert "classcorpus read COURSE SOURCE ORDINAL" in cli_text
+    assert "classcorpus inspect COURSE SOURCE ORDINAL" in cli_text
+    assert "classcorpus inspect COURSE SOURCE ORDINAL" in skill_text
     assert ".venv/bin/classcorpus doctor" in readme
     assert ".venv/bin/classcorpus read" in readme
+    assert ".venv/bin/classcorpus inspect" in readme
 
 
 def test_skill_keeps_typo_suggestions_explicit(skill_text: str):

@@ -24,6 +24,12 @@ All currently planned near-term milestones are complete.
 - Made compact, budgeted retrieval the default with lossless `--full` opt-out
 - Added a cursor-based course outline for token-efficient coverage planning
 - Added optional PDF study-guide rendering with human-readable mathematics
+- Added DOCX extraction with explicit visual and equation review warnings
+- Added remembered course lifecycle commands that preserve source folders
+- Added exact evidence inspection with source freshness and local previews
+- Marked all source-derived payloads as untrusted evidence
+- Centered focused reads on query matches with smaller default passages
+- Added privacy-preserving artifact manifests and source-drift verification
 
 ## Later
 

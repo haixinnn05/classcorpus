@@ -58,13 +58,13 @@ The runner reports:
 - Adaptive reductions versus standard and full retrieval.
 
 The adaptive workflow uses three candidates, a 600-token search budget, and a
-1,200-character selected read. It passes only with complete retrieval,
+900-character selected read. It passes only with complete retrieval,
 every target ranked first, unchanged rank quality, at least 25% savings versus
 the balanced standard workflow, at least 70% savings versus full search,
 median context at or below 2,500 estimated tokens, and p95 at or below 4,000.
 
 The focused workflow merges the same three-candidate decision with the selected
-1,200-character read. It must keep complete recall, top rank, and target
+900-character read. It must keep complete recall, top rank, and target
 evidence while using at least 10% less context than adaptive retrieval and no
 more than 1,900 median estimated tokens.
 

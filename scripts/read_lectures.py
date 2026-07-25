@@ -6,6 +6,7 @@ from dataclasses import asdict
 from _common import argument_parser, emit, fail
 from classcorpus.database import Database
 from classcorpus.records import read_records
+from classcorpus.security import mark_untrusted_content
 
 
 def main() -> int:
@@ -31,10 +32,7 @@ def main() -> int:
             limit=args.limit,
         )
         emit(
-            {
-                "ok": True,
-                **asdict(page),
-            },
+            mark_untrusted_content({"ok": True, **asdict(page)}),
             json_mode=args.json_mode,
         )
         return 0

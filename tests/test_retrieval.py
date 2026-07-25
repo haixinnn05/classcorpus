@@ -50,14 +50,45 @@ def test_focused_retrieval_deduplicates_selected_passage(
     serialized = json.dumps(payload, ensure_ascii=False)
     assert selected["source_file"] == "target.md"
     assert selected["citation"] == "[Physics, target.md, Page 1]"
-    assert selected["returned_chars"] == 1_200
-    assert selected["next_offset"] == 1_200
+    assert selected["returned_chars"] == 900
+    assert selected["offset"] == 0
+    assert selected["next_offset"] == 900
     assert "terminal velocity" in selected["text"]
     assert len(payload["alternatives"]) == 2
     assert "snippet" not in serialized
     assert "source_path" not in serialized
     assert serialized.count("The unique answer is terminal velocity.") == 1
     assert payload["estimated_tokens"] == estimate_tokens(payload)
+
+
+def test_focused_retrieval_centers_passage_on_late_query_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("CLASSCORPUS_DATA_DIR", str(tmp_path / "data"))
+    root = tmp_path / "Physics"
+    root.mkdir()
+    (root / "late.md").write_text(
+        "# Waves\n\n"
+        + ("General wave background without the target. " * 120)
+        + "\n\nresonance-marker means maximum driven amplitude.",
+        encoding="utf-8",
+    )
+    database = Database(tmp_path / "index.sqlite3")
+    database.initialize()
+    assert sync_course(database, "Physics", root).indexed == 1
+
+    payload = retrieve_focused(
+        database,
+        "resonance-marker driven amplitude",
+        course="Physics",
+    )
+    selected = payload["selected"]
+
+    assert selected["offset"] > 0
+    assert selected["has_previous"] is True
+    assert selected["previous_offset"] < selected["offset"]
+    assert "resonance-marker means maximum driven amplitude" in selected["text"]
 
 
 def test_focused_retrieval_cache_key_tracks_content(

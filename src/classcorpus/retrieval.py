@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any
 
 from classcorpus.citations import format_citation
@@ -14,9 +15,10 @@ from classcorpus.record_text import (
     read_record_text,
 )
 from classcorpus.search import SearchResult, search, suggest_terms
+from classcorpus.security import mark_untrusted_content
 
 DEFAULT_FOCUSED_LIMIT = 3
-DEFAULT_FOCUSED_READ_CHARS = 1_200
+DEFAULT_FOCUSED_READ_CHARS = 900
 
 
 def retrieve_focused(
@@ -70,26 +72,38 @@ def retrieve_focused(
         "warnings": warnings,
         "suggested_terms": [] if results else suggest_terms(database, query),
     }
+    mark_untrusted_content(payload)
     message = _message(results, total=health.total, failed=health.failed)
     if message is not None:
         payload["message"] = message
 
     if results:
         selected = results[0]
+        passage_offset = _passage_offset(
+            _record_text(selected, field),
+            query,
+            read_limit,
+        )
         chunk = read_record_text(
             database,
             course=selected.course,
             source_file=selected.source_file,
             ordinal=selected.ordinal,
             field=field,
+            offset=passage_offset,
             limit=read_limit,
         )
         payload["selected"] = {
             **_candidate(selected, rank=1),
             "field": chunk.field,
             "text": chunk.text,
+            "offset": chunk.offset,
             "total_chars": chunk.total_chars,
             "returned_chars": chunk.returned_chars,
+            "has_previous": chunk.offset > 0,
+            "previous_offset": max(0, chunk.offset - read_limit)
+            if chunk.offset > 0
+            else None,
             "has_more": chunk.has_more,
             "next_offset": chunk.next_offset,
         }
@@ -100,6 +114,64 @@ def retrieve_focused(
 
     payload["cache_key"] = _cache_key(payload)
     return with_estimated_tokens(payload)
+
+
+def _record_text(
+    result: SearchResult,
+    field: RecordTextField,
+) -> str:
+    if field != "searchable":
+        value = getattr(result, field)
+        return str(value or "")
+    parts = [
+        ("Title", result.title),
+        ("Body", result.body_text),
+        ("Speaker notes", result.speaker_notes),
+        ("Visual description", result.visual_description),
+        ("OCR", result.ocr_text),
+    ]
+    return "\n\n".join(
+        f"{label}:\n{value}" for label, value in parts if value
+    )
+
+
+def _passage_offset(text: str, query: str, limit: int) -> int:
+    if len(text) <= limit:
+        return 0
+    terms = list(
+        dict.fromkeys(re.findall(r"\w+", query.casefold(), flags=re.UNICODE))
+    )
+    if not terms:
+        return 0
+    anchors = [
+        match.start()
+        for term in terms
+        for match in re.finditer(re.escape(term), text, flags=re.IGNORECASE)
+    ]
+    if not anchors:
+        return 0
+
+    phrase = " ".join(terms)
+    best_start = 0
+    best_score: tuple[int, int, int, int] | None = None
+    for anchor in anchors:
+        start = max(0, min(anchor - limit // 3, len(text) - limit))
+        boundary = text.rfind("\n\n", max(0, start - 160), start)
+        if boundary >= 0:
+            start = boundary + 2
+        segment = text[start : start + limit].casefold()
+        matched = sum(term in segment for term in terms)
+        occurrences = sum(segment.count(term) for term in terms)
+        score = (
+            matched,
+            int(phrase in " ".join(re.findall(r"\w+", segment))),
+            occurrences,
+            -start,
+        )
+        if best_score is None or score > best_score:
+            best_start = start
+            best_score = score
+    return best_start
 
 
 def _candidate(result: SearchResult, *, rank: int) -> dict[str, object]:

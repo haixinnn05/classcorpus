@@ -150,6 +150,13 @@ class Database:
         assert row is not None
         return Course(**dict(row))
 
+    def get_course(self, name: str) -> Course | None:
+        row = self.connection.execute(
+            "SELECT id, name, source_root FROM courses WHERE name = ?",
+            (name,),
+        ).fetchone()
+        return Course(**dict(row)) if row is not None else None
+
     def remove_course(self, name: str) -> bool:
         with self.connection:
             self.connection.execute(

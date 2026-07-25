@@ -74,6 +74,7 @@ def test_index_and_search_scripts_return_json_from_any_working_directory(
     assert warning["ordinal"] == "2"
     assert "embedded-image" in warning["reasons"]
     assert payload["sync_required"] is False
+    assert payload["content_trust"] == "untrusted"
 
 
 def test_vision_queue_and_store_scripts_round_trip(tmp_path: Path):
@@ -162,6 +163,7 @@ def test_powerpoint_review_script_reports_layout_actions(tmp_path: Path):
     assert payload["has_more"] is True
     assert payload["next_offset"] == 1
     assert payload["items"][0]["next_action"] == "export-to-pdf"
+    assert payload["content_trust"] == "untrusted"
 
 
 def test_script_errors_use_json_envelope(tmp_path: Path):
@@ -810,13 +812,47 @@ def test_flashcard_render_script_creates_interactive_html_and_refuses_overwrite(
     payload = json.loads(rendered.stdout)
     refused_payload = json.loads(refused.stdout)
     document = output.read_text(encoding="utf-8")
+    manifest = output.with_name(output.name + ".classcorpus.json")
     assert rendered.returncode == 0, rendered.stderr
     assert payload["rendered"] == 1
     assert payload["title"] == "Algorithms Review"
+    assert payload["manifest"] == str(manifest.resolve())
+    assert manifest.is_file()
     assert "<title>Algorithms Review</title>" in document
     assert "[Algorithms, Lecture08.pptx, Slide 2]" in document
     assert refused.returncode == 1
     assert refused_payload["error"]["type"] == "FileExistsError"
+
+
+def test_study_guide_renderer_creates_provenance_sidecar(tmp_path: Path):
+    source = tmp_path / "guide.md"
+    output = tmp_path / "guide.pdf"
+    source.write_text(
+        "# Physics 1\n\n"
+        "## Resonance\n\n"
+        "Amplitude is largest at resonance. "
+        "[Physics 1, waves.pdf, Page 4]\n",
+        encoding="utf-8",
+    )
+
+    rendered = run_script(
+        "render_study_guide.py",
+        str(source),
+        str(output),
+        "--course-label",
+        "Physics 1",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    manifest = output.with_name(output.name + ".classcorpus.json")
+    assert rendered.returncode == 0, rendered.stderr
+    assert rendered.stdout.strip() == str(output.resolve())
+    assert output.is_file()
+    assert manifest.is_file()
+    assert json.loads(manifest.read_text(encoding="utf-8"))[
+        "unresolved_citations"
+    ] == ["[Physics 1, waves.pdf, Page 4]"]
 
 
 @pytest.mark.parametrize(

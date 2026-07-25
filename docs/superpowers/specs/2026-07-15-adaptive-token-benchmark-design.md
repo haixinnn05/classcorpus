@@ -15,7 +15,7 @@ provider-neutral.
 Each focused query is run through three workflows:
 
 - **Adaptive:** three search candidates, a 600-token search budget, and a
-  1,200-character read of the top result.
+  900-character read of the top result.
 - **Standard:** six search candidates, a 1,200-token search budget, and a
   2,000-character read of the top result.
 - **Full:** six complete search records with no compact-response budget.

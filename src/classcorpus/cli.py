@@ -8,10 +8,11 @@ import shlex
 import sys
 from typing import Any
 
-from classcorpus.database import Database
+from classcorpus.database import Database, remove_course_data
 from classcorpus.diagnostics import doctor_report
 from classcorpus.encoders import create_encoder
 from classcorpus.indexer import sync_course
+from classcorpus.inspection import DEFAULT_INSPECT_CHARS, inspect_record
 from classcorpus.outline import (
     DEFAULT_OUTLINE_BUDGET_TOKENS,
     outline_course,
@@ -20,6 +21,7 @@ from classcorpus.payloads import (
     DEFAULT_SEARCH_BUDGET_TOKENS,
     search_response,
 )
+from classcorpus.provenance import verify_artifact, write_artifact_manifest
 from classcorpus.record_text import RECORD_TEXT_FIELDS, read_record_text
 from classcorpus.retrieval import (
     DEFAULT_FOCUSED_LIMIT,
@@ -27,6 +29,7 @@ from classcorpus.retrieval import (
     retrieve_focused,
 )
 from classcorpus.search import search, suggest_terms
+from classcorpus.security import mark_untrusted_content
 from classcorpus.status import status_report
 
 
@@ -53,14 +56,51 @@ def build_parser() -> CLIArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    add_parser = subparsers.add_parser(
+        "add",
+        help="Add a course folder or synchronize its current contents.",
+    )
+    add_parser.add_argument("course")
+    add_parser.add_argument("source_root", type=Path)
+    _add_json_argument(add_parser)
+    add_parser.set_defaults(handler=_run_index)
+
     index_parser = subparsers.add_parser(
         "index",
-        help="Synchronize a local course folder.",
+        help="Synchronize a course folder (compatibility alias for add).",
     )
     index_parser.add_argument("course")
     index_parser.add_argument("source_root", type=Path)
     _add_json_argument(index_parser)
     index_parser.set_defaults(handler=_run_index)
+
+    list_parser = subparsers.add_parser(
+        "list",
+        help="List remembered courses and their health.",
+    )
+    _add_json_argument(list_parser)
+    list_parser.set_defaults(handler=_run_list)
+
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Synchronize a course from its remembered folder.",
+    )
+    sync_parser.add_argument("course")
+    _add_json_argument(sync_parser)
+    sync_parser.set_defaults(handler=_run_sync)
+
+    remove_parser = subparsers.add_parser(
+        "remove",
+        help="Remove generated data for one course.",
+    )
+    remove_parser.add_argument("course")
+    remove_parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Confirm removal of generated index and render data.",
+    )
+    _add_json_argument(remove_parser)
+    remove_parser.set_defaults(handler=_run_remove)
 
     search_parser = subparsers.add_parser(
         "search",
@@ -140,6 +180,41 @@ def build_parser() -> CLIArgumentParser:
     _add_json_argument(read_parser)
     read_parser.set_defaults(handler=_run_read)
 
+    inspect_parser = subparsers.add_parser(
+        "inspect",
+        help="Inspect exact evidence and verify its source file.",
+    )
+    inspect_parser.add_argument("course")
+    inspect_parser.add_argument("source")
+    inspect_parser.add_argument("ordinal", type=int)
+    inspect_parser.add_argument(
+        "--field",
+        choices=RECORD_TEXT_FIELDS,
+        default="searchable",
+    )
+    inspect_parser.add_argument("--offset", type=int, default=0)
+    inspect_parser.add_argument("--limit", type=int, default=DEFAULT_INSPECT_CHARS)
+    _add_json_argument(inspect_parser)
+    inspect_parser.set_defaults(handler=_run_inspect)
+
+    manifest_parser = subparsers.add_parser(
+        "manifest",
+        help="Create a provenance manifest for a generated artifact.",
+    )
+    manifest_parser.add_argument("artifact", type=Path)
+    manifest_parser.add_argument("--citations-from", required=True, type=Path)
+    manifest_parser.add_argument("--overwrite", action="store_true")
+    _add_json_argument(manifest_parser)
+    manifest_parser.set_defaults(handler=_run_manifest)
+
+    verify_parser = subparsers.add_parser(
+        "verify-artifact",
+        help="Verify an artifact and its cited source files.",
+    )
+    verify_parser.add_argument("artifact", type=Path)
+    _add_json_argument(verify_parser)
+    verify_parser.set_defaults(handler=_run_verify_artifact)
+
     outline_parser = subparsers.add_parser(
         "outline",
         help="Plan exhaustive coverage without loading complete record bodies.",
@@ -194,12 +269,42 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run_index(arguments: argparse.Namespace) -> int:
     database = _database()
-    report = sync_course(
+    return _synchronize(
         database,
-        arguments.course,
-        arguments.source_root,
+        course=arguments.course,
+        source_root=arguments.source_root,
+        json_mode=arguments.json_mode,
     )
+
+
+def _run_sync(arguments: argparse.Namespace) -> int:
+    database = _database()
+    course = database.get_course(arguments.course)
+    if course is None:
+        raise ValueError(
+            f"course not found: {arguments.course}. Add it with "
+            "`classcorpus add COURSE SOURCE_ROOT`."
+        )
+    return _synchronize(
+        database,
+        course=course.name,
+        source_root=Path(course.source_root),
+        json_mode=arguments.json_mode,
+    )
+
+
+def _synchronize(
+    database: Database,
+    *,
+    course: str,
+    source_root: Path,
+    json_mode: bool,
+) -> int:
+    resolved_root = source_root.expanduser().resolve()
+    report = sync_course(database, course, resolved_root)
     payload: dict[str, Any] = {"ok": report.failed == 0, **asdict(report)}
+    payload["course"] = course
+    payload["source_root"] = str(resolved_root)
     if report.failed:
         payload["error"] = {
             "type": "PartialSyncError",
@@ -208,7 +313,7 @@ def _run_index(arguments: argparse.Namespace) -> int:
                 "files were preserved"
             ),
         }
-    if arguments.json_mode:
+    if json_mode:
         _emit_json(payload)
     else:
         print(
@@ -220,6 +325,38 @@ def _run_index(arguments: argparse.Namespace) -> int:
                 f"{report.records_review_needed} updated records need review."
             )
     return 0 if report.failed == 0 else 1
+
+
+def _run_list(arguments: argparse.Namespace) -> int:
+    report = status_report(_database())
+    if arguments.json_mode:
+        _emit_json(report)
+    else:
+        _print_course_status(report)
+    return 0
+
+
+def _run_remove(arguments: argparse.Namespace) -> int:
+    if not arguments.confirm:
+        raise ValueError("course removal requires --confirm")
+    database = _database()
+    removed = remove_course_data(
+        database,
+        arguments.course,
+        confirmed=True,
+    )
+    payload = {
+        "ok": True,
+        "course": arguments.course,
+        "removed": removed,
+    }
+    if arguments.json_mode:
+        _emit_json(payload)
+    elif removed:
+        print(f"Removed generated data for {arguments.course}.")
+    else:
+        print(f"Course not found: {arguments.course}.")
+    return 0
 
 
 def _run_search(arguments: argparse.Namespace) -> int:
@@ -392,7 +529,7 @@ def _run_read(arguments: argparse.Namespace) -> int:
         offset=arguments.offset,
         limit=arguments.limit,
     )
-    payload = {"ok": True, **asdict(chunk)}
+    payload = mark_untrusted_content({"ok": True, **asdict(chunk)})
     if arguments.json_mode:
         _emit_json(payload)
         return 0
@@ -422,16 +559,77 @@ def _run_read(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _run_inspect(arguments: argparse.Namespace) -> int:
+    payload = inspect_record(
+        _database(),
+        course=arguments.course,
+        source_file=arguments.source,
+        ordinal=arguments.ordinal,
+        field=arguments.field,
+        offset=arguments.offset,
+        limit=arguments.limit,
+    )
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0
+
+    print(f"{payload['citation']} {payload['title'] or '(untitled)'}")
+    print(f"Source: {payload['source_path']}")
+    print(f"Verification: {payload['source_verification']}")
+    print(payload["text"] or f"(no text in {payload['field']})")
+    if payload["render_available"]:
+        print(f"Preview: {payload['render_path']}")
+    for asset in payload["visual_assets"]:
+        if asset["available"]:
+            print(f"Preview asset: {asset['path']}")
+    for warning in payload["warnings"]:
+        print(f"Warning: {warning['message']}")
+    if payload["continuation"] is not None:
+        print(f"Continue: {payload['continuation']['command']}")
+    return 0
+
+
+def _run_manifest(arguments: argparse.Namespace) -> int:
+    payload = write_artifact_manifest(
+        _database(),
+        artifact=arguments.artifact,
+        citation_source=arguments.citations_from,
+        overwrite=arguments.overwrite,
+    )
+    payload = {"ok": True, **payload}
+    if arguments.json_mode:
+        _emit_json(payload)
+    else:
+        print(payload["manifest"])
+    return 0
+
+
+def _run_verify_artifact(arguments: argparse.Namespace) -> int:
+    payload = verify_artifact(_database(), arguments.artifact)
+    if arguments.json_mode:
+        _emit_json(payload)
+    else:
+        print(f"{payload['status']}: {payload['artifact']}")
+        for issue in payload["issues"]:
+            print(f"- {issue['message']}")
+    return 0 if payload["ok"] else 1
+
+
 def _run_status(arguments: argparse.Namespace) -> int:
     report = status_report(_database(), course=arguments.course)
     if arguments.json_mode:
         _emit_json(report)
         return 0
+    _print_course_status(report)
+    return 0
+
+
+def _print_course_status(report: dict[str, object]) -> None:
     if not report["courses"]:
         print("No matching indexed courses.")
         for action in report["next_actions"]:
             print(f"Next: {action}")
-        return 0
+        return
     for course in report["courses"]:
         print(
             f"{course['name']}: {course['records_total']} records from "
@@ -449,7 +647,6 @@ def _run_status(arguments: argparse.Namespace) -> int:
         )
         for action in course["next_actions"]:
             print(f"  Next: {action}")
-    return 0
 
 
 def _run_doctor(arguments: argparse.Namespace) -> int:

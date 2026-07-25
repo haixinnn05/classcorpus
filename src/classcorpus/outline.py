@@ -8,6 +8,7 @@ from typing import Any
 
 from classcorpus.database import Database
 from classcorpus.payloads import estimate_tokens, with_estimated_tokens
+from classcorpus.security import mark_untrusted_content
 
 DEFAULT_OUTLINE_BUDGET_TOKENS = 1_500
 
@@ -119,6 +120,7 @@ def outline_course(
         "budget_tokens": budget_tokens,
         "budget_exhausted": False,
     }
+    mark_untrusted_content(payload)
     source_ids: dict[tuple[object, ...], str] = {}
     visible_groups: list[dict[str, Any]] = []
     consumed_before = _count_before_cursor(

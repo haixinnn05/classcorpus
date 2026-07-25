@@ -7,6 +7,7 @@ from typing import Any, Iterable
 
 from classcorpus.citations import format_citation
 from classcorpus.search import SearchResult
+from classcorpus.security import mark_untrusted_content
 
 DEFAULT_SEARCH_BUDGET_TOKENS = 1_200
 MAX_COMPACT_RESULTS = 6
@@ -44,6 +45,7 @@ def search_response(
         "warnings": list(warnings),
         "suggested_terms": list(suggested_terms),
     }
+    mark_untrusted_content(common)
     if compact_option_used:
         common["deprecated_options"] = ["--compact"]
     if message is not None:

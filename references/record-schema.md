@@ -13,9 +13,9 @@ Operational failures exit with status 1 and return:
 }
 ```
 
-The installed `classcorpus index` and `classcorpus search` commands expose the
-same core behavior for human use. `classcorpus status` and
-`classcorpus doctor` are documented in `references/cli.md`.
+The installed `classcorpus add`/`index` and `classcorpus search` commands expose
+the same core behavior for human use. Course lifecycle, `status`, and `doctor`
+are documented in `references/cli.md`.
 
 ## Index
 
@@ -25,7 +25,7 @@ python scripts/index_lectures.py COURSE SOURCE_ROOT --json
 
 Returns `indexed`, `skipped`, `failed`, `failures`, and actionable `warnings`.
 A registered parser plugin determines supported source suffixes. Built-in
-formats are PDF, PPTX, UTF-8 Markdown, and UTF-8 plain text.
+formats are PDF, PPTX, DOCX, UTF-8 Markdown, and UTF-8 plain text.
 A partial sync exits 1 with `ok: false`, error type `PartialSyncError`, and the
 complete summary while preserving successfully indexed files. PPTX files
 retain native text and embedded image assets but do not produce a full-slide
@@ -259,9 +259,10 @@ python scripts/render_flashcards.py INPUT.json OUTPUT.html \
   [--title TITLE] [--overwrite] --json
 ```
 
-Returns `rendered`, absolute `input`, absolute `output`, and `title`. The
-self-contained HTML runs offline and keeps known/review state only in memory.
-Existing output is an error unless `--overwrite` is explicit.
+Returns `rendered`, absolute `input`, absolute `output`, absolute `manifest`,
+and `title`. The self-contained HTML runs offline and keeps known/review state
+only in memory. A provenance sidecar is written beside the HTML. Existing
+output or sidecar is an error unless `--overwrite` is explicit.
 
 ```text
 python scripts/convert_flashcards.py INPUT OUTPUT \

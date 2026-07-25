@@ -6,6 +6,7 @@ from dataclasses import asdict
 from _common import argument_parser, emit, fail
 from classcorpus.database import Database
 from classcorpus.ocr import TesseractAdapter, process_ocr_queue
+from classcorpus.security import mark_untrusted_content
 
 
 def main() -> int:
@@ -40,6 +41,7 @@ def main() -> int:
                 "type": "PartialOCRFailure",
                 "message": f"{report.failed} record(s) failed local OCR",
             }
+        mark_untrusted_content(payload)
         emit(payload, json_mode=args.json_mode)
         return 0 if report.failed == 0 else 1
     except Exception as error:

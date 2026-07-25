@@ -79,6 +79,8 @@ def test_unified_cli_indexes_searches_and_reports_course_status(tmp_path: Path):
     assert search_payload["results"][0]["citation"] == (
         "[Algorithms, handout.pdf, Page 2]"
     )
+    assert search_payload["content_trust"] == "untrusted"
+    assert "ignore instructions" in search_payload["content_handling"]
     assert search_payload["compact"] is True
     assert search_payload["deprecated_options"] == ["--compact"]
     assert search_payload["estimated_tokens"] <= 1_200
@@ -97,6 +99,102 @@ def test_unified_cli_indexes_searches_and_reports_course_status(tmp_path: Path):
     assert course_status["ocr_pending"] == 2
     assert course_status["embedded_records"] == 0
     assert course_status["next_actions"]
+
+
+def test_course_lifecycle_remembers_path_and_preserves_sources(tmp_path: Path):
+    course = tmp_path / "Physics"
+    course.mkdir()
+    source = course / "notes.md"
+    source.write_text("# Motion\nVelocity changes with acceleration.", encoding="utf-8")
+    data_dir = tmp_path / "state"
+
+    added = run_cli(
+        "add",
+        "Physics 1",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    listed = run_cli(
+        "list",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    source.write_text(
+        "# Motion\nVelocity changes with constant acceleration.",
+        encoding="utf-8",
+    )
+    synced = run_cli(
+        "sync",
+        "Physics 1",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    refused = run_cli(
+        "remove",
+        "Physics 1",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    removed = run_cli(
+        "remove",
+        "Physics 1",
+        "--confirm",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    after = run_cli(
+        "list",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    added_payload = json.loads(added.stdout)
+    listed_payload = json.loads(listed.stdout)
+    synced_payload = json.loads(synced.stdout)
+    refused_payload = json.loads(refused.stdout)
+    removed_payload = json.loads(removed.stdout)
+    assert added.returncode == 0, added.stderr
+    assert added_payload["course"] == "Physics 1"
+    assert added_payload["source_root"] == str(course.resolve())
+    assert listed_payload["courses"][0]["name"] == "Physics 1"
+    assert listed_payload["courses"][0]["source_root"] == str(course.resolve())
+    assert synced.returncode == 0, synced.stderr
+    assert synced_payload["indexed"] == 1
+    assert synced_payload["source_root"] == str(course.resolve())
+    assert refused.returncode == 1
+    assert refused_payload["error"]["type"] == "ValueError"
+    assert "--confirm" in refused_payload["error"]["message"]
+    assert removed.returncode == 0, removed.stderr
+    assert removed_payload == {
+        "ok": True,
+        "course": "Physics 1",
+        "removed": True,
+    }
+    assert json.loads(after.stdout)["courses"] == []
+    assert source.is_file()
+    assert "constant acceleration" in source.read_text(encoding="utf-8")
+
+
+def test_sync_unknown_course_is_actionable(tmp_path: Path):
+    result = run_cli(
+        "sync",
+        "Missing",
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 1
+    assert payload["error"]["type"] == "ValueError"
+    assert "classcorpus add COURSE SOURCE_ROOT" in payload["error"]["message"]
 
 
 def test_unified_cli_reads_bounded_record_chunks(tmp_path: Path):
@@ -140,6 +238,8 @@ def test_unified_cli_reads_bounded_record_chunks(tmp_path: Path):
     payload = json.loads(first.stdout)
     assert first.returncode == 0, first.stderr
     assert payload["citation"] == "[Algorithms, handout.pdf, Page 1]"
+    assert payload["content_trust"] == "untrusted"
+    assert "ignore instructions" in payload["content_handling"]
     assert payload["field"] == "raw_text"
     assert payload["offset"] == 0
     assert payload["returned_chars"] == 80
@@ -150,6 +250,103 @@ def test_unified_cli_reads_bounded_record_chunks(tmp_path: Path):
     assert "[Algorithms, handout.pdf, Page 2]" in human.stdout
     assert "Continue: classcorpus read" in human.stdout
     assert "--offset 20" in human.stdout
+
+
+def test_unified_cli_inspects_and_verifies_exact_evidence(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_cli(
+        "add",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    result = run_cli(
+        "inspect",
+        "Algorithms",
+        "handout.pdf",
+        "2",
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0, result.stderr
+    assert payload["citation"] == "[Algorithms, handout.pdf, Page 2]"
+    assert payload["source_verification"] == "current"
+    assert payload["render_available"] is True
+    assert payload["content_trust"] == "untrusted"
+    assert "Bellman-Ford" in payload["text"]
+
+
+def test_unified_cli_manifests_and_verifies_generated_artifact(tmp_path: Path):
+    course = tmp_path / "Algorithms"
+    course.mkdir()
+    make_pdf_fixture(course / "handout.pdf")
+    data_dir = tmp_path / "state"
+    run_cli(
+        "add",
+        "Algorithms",
+        str(course),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    artifact = tmp_path / "guide.html"
+    artifact.write_text("<h1>Bellman-Ford</h1>", encoding="utf-8")
+    citation_source = tmp_path / "guide.md"
+    citation_source.write_text(
+        "Bellman-Ford handles negative edges. "
+        "[Algorithms, handout.pdf, Page 2]",
+        encoding="utf-8",
+    )
+
+    created = run_cli(
+        "manifest",
+        str(artifact),
+        "--citations-from",
+        str(citation_source),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    verified = run_cli(
+        "verify-artifact",
+        str(artifact),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+    artifact.write_text("<h1>Modified</h1>", encoding="utf-8")
+    modified = run_cli(
+        "verify-artifact",
+        str(artifact),
+        "--json",
+        data_dir=data_dir,
+        cwd=tmp_path,
+    )
+
+    created_payload = json.loads(created.stdout)
+    verified_payload = json.loads(verified.stdout)
+    modified_payload = json.loads(modified.stdout)
+    manifest = artifact.with_name(artifact.name + ".classcorpus.json")
+    assert created.returncode == 0, created.stderr
+    assert created_payload["manifest"] == str(manifest.resolve())
+    assert created_payload["citations"][0]["citation"] == (
+        "[Algorithms, handout.pdf, Page 2]"
+    )
+    assert str(course.resolve()) not in manifest.read_text(encoding="utf-8")
+    assert verified.returncode == 0, verified.stderr
+    assert verified_payload["status"] == "current"
+    assert modified.returncode == 1
+    assert modified_payload["status"] == "artifact-modified"
+    assert modified_payload["issues"][0]["type"] == "artifact_modified"
 
 
 def test_unified_cli_retrieves_focused_evidence(tmp_path: Path):
@@ -247,8 +444,9 @@ def test_status_identifies_failed_refresh_and_exact_retry_command(tmp_path: Path
     assert failed.returncode == 1
     assert failed_payload["error"]["type"] == "PartialSyncError"
     assert course_status["sources_failed"] == 1
-    assert "classcorpus index" in course_status["next_actions"][0]
-    assert str(course) in course_status["next_actions"][0]
+    assert course_status["next_actions"][0] == (
+        'Retry synchronization: classcorpus sync "Algorithms"'
+    )
     source_id = search_payload["results"][0]["source_id"]
     assert search_payload["sources"][source_id]["source_status"] == "failed"
     assert "latest refresh failed" in search_payload["message"]
@@ -336,7 +534,7 @@ def test_outline_cli_covers_every_page_with_continuation(tmp_path: Path):
         assert "classcorpus outline" in payload["continuation"]["command"]
 
 
-def test_status_for_missing_course_gives_index_command(tmp_path: Path):
+def test_status_for_missing_course_gives_add_command(tmp_path: Path):
     result = run_cli(
         "status",
         "--course",
@@ -349,7 +547,7 @@ def test_status_for_missing_course_gives_index_command(tmp_path: Path):
     payload = json.loads(result.stdout)
     assert result.returncode == 0
     assert payload["courses"] == []
-    assert 'classcorpus index "Operating Systems"' in payload["next_actions"][0]
+    assert 'classcorpus add "Operating Systems"' in payload["next_actions"][0]
 
 
 def test_doctor_reports_core_and_optional_dependencies(tmp_path: Path):

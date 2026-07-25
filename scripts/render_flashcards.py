@@ -4,8 +4,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from _common import argument_parser, emit, fail
+from classcorpus.database import Database
 from classcorpus.flashcard_html import DEFAULT_TITLE, write_flashcards_html
 from classcorpus.flashcards import load_flashcards
+from classcorpus.provenance import (
+    manifest_path,
+    write_artifact_manifest,
+)
 
 
 def main() -> int:
@@ -19,11 +24,24 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", dest="json_mode")
     args = parser.parse_args()
     try:
+        sidecar = manifest_path(args.output.expanduser().resolve())
+        if sidecar.exists() and not args.overwrite:
+            raise FileExistsError(
+                f"manifest already exists: {sidecar}; pass --overwrite to replace it"
+            )
         cards = load_flashcards(args.input)
         write_flashcards_html(
             cards,
             args.output,
             title=args.title,
+            overwrite=args.overwrite,
+        )
+        database = Database()
+        database.initialize()
+        provenance = write_artifact_manifest(
+            database,
+            artifact=args.output,
+            citation_source=args.input,
             overwrite=args.overwrite,
         )
         emit(
@@ -32,6 +50,7 @@ def main() -> int:
                 "rendered": len(cards),
                 "input": str(args.input.resolve()),
                 "output": str(args.output.resolve()),
+                "manifest": provenance["manifest"],
                 "title": args.title.strip(),
             },
             json_mode=args.json_mode,

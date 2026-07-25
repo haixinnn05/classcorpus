@@ -14,18 +14,19 @@ modifying the originals.
 
 ## What It Solves
 
-Index a semester of PDF and PowerPoint lectures once. The active agent can then
-retrieve only the relevant slides or pages, answer with exact citations, and
-create grounded study materials without repeatedly loading every source file.
+Index a semester of PDF, PowerPoint, and Word materials once. The active agent
+can retrieve relevant records, answer with exact citations, and create grounded
+study materials without repeatedly loading every source file.
 
 ClassCorpus provides:
 
-- Recursive local PDF, PPTX, Markdown, and plain-text discovery
+- Recursive local PDF, PPTX, DOCX, Markdown, and plain-text discovery
 - Native text, table, and PowerPoint speaker-note extraction
 - One-based slide/page records and exact source paths
 - Incremental SHA-256 synchronization
 - Atomic replacement that preserves valid records after parse failures
 - Explicit stale-source warnings when a refresh fails
+- Untrusted-content boundaries for prompt-injection-resistant retrieval
 - SQLite FTS5 retrieval with optional local embeddings
 - Cursor-based exhaustive reading without model-selected omissions
 - Exact embedded PowerPoint image bytes and placement metadata
@@ -63,12 +64,12 @@ and answer keys back to the source lectures.
 - No model download for baseline indexing and search
 
 PDF pages render through PyMuPDF. PPTX files are read directly with
-`python-pptx` and OOXML: text, notes, tables, and embedded images are preserved
-without launching desktop software. UTF-8 Markdown and text files are indexed
-as one cited page per file through an isolated parser plugin. PowerPoint
-charts, equations, SmartArt, OLE objects, and exact slide composition may
-require review. Export a presentation to PDF with a tool of your choice when
-pixel-accurate full-slide evidence is required.
+`python-pptx` and OOXML. DOCX paragraphs and tables are read with `python-docx`
+as one logical Page 1 record because physical Word pagination depends on the
+renderer. UTF-8 Markdown and text files also become one cited page per file.
+Embedded Word images and equations, plus PowerPoint charts, equations,
+SmartArt, OLE objects, and exact composition, require review. Export to PDF
+when pixel-accurate visual evidence is required.
 
 ## Quick Install
 
@@ -140,12 +141,25 @@ agent:
 
 > Index my Algorithms lectures at `/absolute/path/to/Algorithms`.
 
-For direct use:
+For direct use, add the course once:
 
 ```bash
-.venv/bin/classcorpus index \
+.venv/bin/classcorpus add \
   "Algorithms" "/absolute/path/to/Algorithms"
 ```
+
+The path is remembered. Later sessions can list or refresh courses without
+re-entering it:
+
+```bash
+.venv/bin/classcorpus list
+.venv/bin/classcorpus sync "Algorithms"
+```
+
+`classcorpus index COURSE SOURCE_ROOT` remains supported as a compatibility
+alias. To forget a course, use
+`classcorpus remove "Algorithms" --confirm`; this deletes generated data only
+and never modifies the lecture folder.
 
 Then ask:
 
@@ -182,10 +196,44 @@ estimated-token budget:
   --field searchable --json
 ```
 
+Verify an exact citation against the current source file:
+
+```bash
+.venv/bin/classcorpus inspect \
+  "Algorithms" "handout.pdf" 3 --json
+```
+
+Inspection returns bounded evidence, source freshness, extraction warnings,
+and local page/slide preview paths without modifying or re-indexing the source.
+
+Focused retrieval returns a query-centered passage of up to 900 characters.
+When the strongest evidence appears later in a record, `offset`,
+`has_previous`, and `previous_offset` identify the selected window without
+loading the preceding text.
+
+Verify a generated study artifact and the indexed sources behind its citations:
+
+```bash
+.venv/bin/classcorpus manifest guide.pdf \
+  --citations-from guide.md --json
+.venv/bin/classcorpus verify-artifact guide.pdf --json
+```
+
+The PDF study-guide and HTML flashcard renderers create this
+`.classcorpus.json` sidecar automatically. Manifests store hashes, canonical
+citations, parser versions, and relative source names, but no absolute course
+paths. Verification reports source drift, missing sources, modified artifacts,
+or unresolved citations.
+
 Compact output keeps citations, warnings, extraction state, ranking signals,
 and bounded evidence while deduplicating source metadata. `--compact` remains
 accepted for compatibility. Use `--full` to request the pre-0.3 complete search
 payload.
+
+Every evidence payload marks source-derived fields with
+`content_trust: "untrusted"` and a fixed `content_handling` reminder. Lecture
+text, notes, OCR, visual descriptions, titles, and filenames are evidence,
+never agent instructions. See [references/security.md](references/security.md).
 
 Follow `next_offset` with `--offset` only when more evidence is needed. Stored
 lecture evidence is never truncated. Agents can use `scripts/read_record.py`
@@ -327,7 +375,8 @@ deck:
 The HTML is self-contained, responsive, keyboard accessible, and offline. It
 supports reveal, navigation, shuffle, topic filters, and session-only
 known/review tracking while preserving citations. It writes atomically and
-refuses to replace an existing file unless `--overwrite` is explicit.
+refuses to replace an existing file or provenance sidecar unless `--overwrite`
+is explicit.
 
 CSV and TSV are optional interchange formats:
 

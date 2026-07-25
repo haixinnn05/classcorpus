@@ -6,22 +6,42 @@ scripts remain stable agent-facing JSON contracts.
 ## Core Commands
 
 ```text
+classcorpus add COURSE SOURCE_ROOT [--json]
+classcorpus list [--json]
+classcorpus sync COURSE [--json]
+classcorpus remove COURSE --confirm [--json]
 classcorpus index COURSE SOURCE_ROOT [--json]
 classcorpus search QUERY [--course COURSE] [--source PATH] \
   [--ordinal N] [--limit N] [--semantic] [--backend BACKEND] \
   [--budget-tokens N] [--full] [--compact] [--json]
 classcorpus read COURSE SOURCE ORDINAL [--field FIELD] \
   [--offset N] [--limit N] [--json]
+classcorpus inspect COURSE SOURCE ORDINAL [--field FIELD] \
+  [--offset N] [--limit N] [--json]
+classcorpus manifest ARTIFACT --citations-from INPUT \
+  [--overwrite] [--json]
+classcorpus verify-artifact ARTIFACT [--json]
 classcorpus outline COURSE [--source PATH] [--cursor CURSOR] \
   [--budget-tokens N] [--json]
 classcorpus status [--course COURSE] [--json]
 classcorpus doctor [--json]
 ```
 
-`index` and `search` preserve the behavior and fields of their corresponding
-scripts. Without `--json`, the CLI prints compact output intended for a person.
-With `--json`, success payloads contain `"ok": true`, and failures exit nonzero
-with a structured error.
+## Course Lifecycle
+
+`add` indexes a folder and remembers its canonical path. `sync` refreshes a
+remembered course without requiring the path again. `list` reports every
+course and its current health. `remove --confirm` deletes only generated index,
+render, OCR, and embedding data; it never modifies source course files.
+
+`index` remains a compatibility alias for `add`. Both preserve the agent-facing
+`index_lectures.py` report fields and add `course` and `source_root`. Without
+`--json`, commands print compact human output. With `--json`, success payloads
+contain `"ok": true`, and failures exit nonzero with a structured error.
+
+Evidence-bearing payloads also contain `content_trust: "untrusted"` and a fixed
+`content_handling` rule. Apply that rule to every source-derived field,
+including filenames and titles. See [security.md](security.md).
 
 Focused search retrieves a wider FTS candidate set, then reranks it using query
 term coverage, exact phrase presence, and title matches. When no record
@@ -61,10 +81,41 @@ command only when more text remains.
 ## Retrieve
 
 `classcorpus retrieve QUERY --course COURSE --json` combines three ranked
-candidates and a 1,200-character read of the top result. The selected passage
+candidates and a query-centered, 900-character read of the top result. The
+window moves to later matching evidence and reports `offset`, `has_previous`,
+and `previous_offset`. The selected passage
 appears once; alternatives keep citations and ranking signals without
 duplicate snippets or absolute paths. Reuse an identical `cache_key` only
 within the current task.
+
+## Inspect
+
+`inspect` returns bounded evidence for one exact page or slide and verifies the
+current source against its indexed SHA-256 and parser version. It reports
+`current`, `changed`, `missing`, `stale-parser`, or `unavailable`, plus the
+original path, extraction warnings, render availability, embedded visual
+assets, and a continuation command.
+
+Inspection is read-only. When evidence is stale, run `classcorpus sync COURSE`
+before relying on it. JSON output is marked as untrusted source content.
+
+## Artifact Provenance
+
+`manifest` writes `ARTIFACT.classcorpus.json` beside a generated file. It
+hashes the artifact and citation-bearing input, extracts canonical citations,
+and records the indexed source hash and parser version for every resolved
+source. Absolute local source paths are never stored in the manifest.
+
+Use `--citations-from` with the cited Markdown or flashcard JSON used to create
+the artifact. Existing manifests require `--overwrite`. The study-guide PDF
+and flashcard HTML renderers create or update their sidecars automatically.
+
+`verify-artifact` compares the current artifact and cited course files with
+their stored hashes. JSON statuses are `current`, `artifact-modified`,
+`artifact-missing`, `source-changed`, `source-missing`, or `unverified`.
+Missing manifests are command errors. Unresolved citations create a manifest
+but make verification `unverified`; fix the citation or synchronize the course
+before treating it as current.
 
 ## Outline
 
@@ -89,7 +140,7 @@ truncated.
 - concrete next actions for failed refreshes, review work, or OCR failures.
 
 An unknown course is not an operational error. It returns an empty course list
-and the exact `classcorpus index` command to start.
+and the exact `classcorpus add` command to start.
 
 ## Doctor
 

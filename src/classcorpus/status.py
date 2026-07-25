@@ -47,11 +47,11 @@ def status_report(
     actions: list[str] = []
     if course is not None and not statuses:
         actions.append(
-            f'Index the course with: classcorpus index "{course}" SOURCE_ROOT'
+            f'Add the course with: classcorpus add "{course}" SOURCE_ROOT'
         )
     elif not statuses:
         actions.append(
-            'Index a course with: classcorpus index "COURSE" SOURCE_ROOT'
+            'Add a course with: classcorpus add "COURSE" SOURCE_ROOT'
         )
     return {
         "ok": True,
@@ -119,7 +119,7 @@ def _course_status(database: Database, course_row) -> CourseStatus:
     source_root = str(course_row["source_root"])
     if int(source_counts["failed"]):
         actions.append(
-            f'Retry synchronization: classcorpus index "{name}" "{source_root}"'
+            f'Retry synchronization: classcorpus sync "{name}"'
         )
     if int(record_counts["review_needed"]):
         actions.append(
@@ -151,4 +151,3 @@ def _course_status(database: Database, course_row) -> CourseStatus:
 
 
 __all__ = ["CourseStatus", "status_report"]
-

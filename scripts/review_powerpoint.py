@@ -6,6 +6,7 @@ from dataclasses import asdict
 from _common import argument_parser, emit, fail
 from classcorpus.database import Database
 from classcorpus.review import LAYOUT_REASONS, list_powerpoint_reviews
+from classcorpus.security import mark_untrusted_content
 
 
 def main() -> int:
@@ -33,7 +34,7 @@ def main() -> int:
             offset=args.offset,
         )
         emit(
-            {"ok": True, **asdict(report)},
+            mark_untrusted_content({"ok": True, **asdict(report)}),
             json_mode=args.json_mode,
         )
         return 0
@@ -43,4 +44,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

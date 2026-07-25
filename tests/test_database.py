@@ -27,6 +27,8 @@ def test_course_lifecycle(tmp_path):
     assert course.source_root == str((tmp_path / "lectures").resolve())
     assert updated.id == course.id
     assert updated.source_root == str((tmp_path / "updated-lectures").resolve())
+    assert db.get_course("Algorithms") == updated
+    assert db.get_course("Missing") is None
     assert db.connection.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 1
     assert db.remove_course("Algorithms") is True
     assert db.remove_course("Algorithms") is False

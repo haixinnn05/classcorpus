@@ -2,11 +2,28 @@
 
 ## Unreleased
 
+### Added
+
+- Inspect exact citation evidence, source freshness, extraction warnings, and
+  local visual previews with `classcorpus inspect`.
+- Manage remembered course folders with `classcorpus add`, `list`, `sync`, and
+  guarded `remove` commands while preserving the legacy `index` command.
+- Index DOCX paragraphs, hyperlinks, tables, and OOXML text as a cited logical
+  document record, with explicit review warnings for images and equations.
+- Mark every evidence-bearing agent payload as untrusted source content and
+  instruct agents to ignore instructions embedded in lecture materials.
+- Create privacy-preserving artifact provenance manifests and verify generated
+  outputs against their cited indexed sources with `verify-artifact`.
+- Write provenance sidecars automatically for PDF study guides and interactive
+  HTML flashcard decks.
+
 ### Changed
 
 - Automatically typeset standalone equations and inline math in PDF study
   guides, including stacked compact/LaTeX matrices, column vectors,
   determinant bars, fractions, Greek symbols, and common named functions.
+- Center focused retrieval on matching evidence and reduce its default selected
+  passage from 1,200 to 900 characters.
 
 ## 0.4.0 - 2026-07-15
 

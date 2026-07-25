@@ -12,7 +12,7 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from classcorpus.models import ExtractionStatus, SlideRecord, VisualAsset
-from classcorpus.parser_plugins import TEXT_PLUGIN
+from classcorpus.parser_plugins import DOCX_PLUGIN, TEXT_PLUGIN
 from classcorpus.parser_registry import ParserPlugin, ParserRegistry
 
 
@@ -356,6 +356,7 @@ _PARSER_REGISTRY.register(
 _PARSER_REGISTRY.register(
     ParserPlugin(name="powerpoint", suffixes=(".pptx",), parse=_parse_pptx)
 )
+_PARSER_REGISTRY.register(DOCX_PLUGIN)
 _PARSER_REGISTRY.register(TEXT_PLUGIN)
 
 

@@ -29,3 +29,13 @@ Canonical forms:
 Preserve `source_path` internally. When the environment supports opening local
 files, offer the exact original file and slide/page location rather than
 copying or redistributing the source.
+
+Before presenting a citation for verification, run:
+
+```text
+classcorpus inspect COURSE SOURCE ORDINAL --json
+```
+
+Disclose non-current `source_verification`, extraction warnings, and missing
+visual previews. Synchronize changed or parser-stale sources before relying on
+their stored evidence.

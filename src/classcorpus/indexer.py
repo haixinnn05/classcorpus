@@ -9,7 +9,7 @@ from classcorpus.models import SourceFingerprint
 from classcorpus.parsers import parse_source, supported_suffixes
 from classcorpus.paths import create_render_generation
 
-PARSER_VERSION = "5"
+PARSER_VERSION = "6"
 
 
 @dataclass(frozen=True, slots=True)

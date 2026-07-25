@@ -45,3 +45,14 @@ indexed as `review-needed` with `no-native-text`.
 Text files have no render. Visual review and OCR therefore require a separate
 rendered source such as PDF.
 
+## Built-In DOCX Plugin
+
+The `word-documents` plugin handles `.docx` files with `python-docx`. It
+preserves paragraphs, hyperlinks, tables, and underlying OOXML text in one
+logical Page 1 record. Word files do not encode stable physical pagination, so
+the citation identifies the complete document rather than a rendered page.
+
+The document title metadata is preferred as the record title; otherwise the
+first nonblank block is used. Embedded images, equations or objects, unmapped
+OOXML text, and empty documents produce explicit review reasons. DOCX files
+have no render; use a PDF export when layout or physical page position matters.

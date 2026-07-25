@@ -33,6 +33,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from classcorpus.database import Database
 from classcorpus.math_notation import (
     group_math_lines,
     looks_like_display_math,
@@ -40,6 +41,7 @@ from classcorpus.math_notation import (
     normalize_math_expression,
     strip_display_math_delimiters,
 )
+from classcorpus.provenance import write_artifact_manifest
 
 PAGE_LABEL = "STUDY GUIDE"
 FOOTER_LABEL = "COURSE MATERIALS"
@@ -638,6 +640,14 @@ def main() -> None:
     )
     story.extend(markdown_story(source_text, st))
     document.build(story, onFirstPage=page_decor, onLaterPages=page_decor)
+    database = Database()
+    database.initialize()
+    write_artifact_manifest(
+        database,
+        artifact=arguments.output,
+        citation_source=arguments.source,
+        overwrite=True,
+    )
     print(arguments.output.resolve())
 
 

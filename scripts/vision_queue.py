@@ -5,6 +5,7 @@ from dataclasses import asdict
 
 from _common import argument_parser, emit, fail
 from classcorpus.database import Database
+from classcorpus.security import mark_untrusted_content
 from classcorpus.vision import get_vision_queue
 
 
@@ -19,7 +20,9 @@ def main() -> int:
         database.initialize()
         items = get_vision_queue(database, args.course, limit=args.limit)
         emit(
-            {"ok": True, "items": [asdict(item) for item in items]},
+            mark_untrusted_content(
+                {"ok": True, "items": [asdict(item) for item in items]}
+            ),
             json_mode=args.json_mode,
         )
         return 0
