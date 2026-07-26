@@ -30,11 +30,17 @@ def test_release_workflow_builds_and_smoke_tests_all_artifacts():
     assert "classcorpus doctor --json" in commands
     assert "RELEASE_TAG" in commands
 
-    upload = next(
-        step for step in build_steps if step.get("uses") == "actions/upload-artifact@v4"
-    )
-    assert upload["with"]["path"] == "dist/"
-    assert upload["with"]["if-no-files-found"] == "error"
+    uploads = {
+        step["with"]["name"]: step["with"]
+        for step in build_steps
+        if step.get("uses") == "actions/upload-artifact@v4"
+    }
+    assert uploads["release-assets"]["path"] == "dist/"
+    assert uploads["release-assets"]["if-no-files-found"] == "error"
+    assert "dist/*.whl" in uploads["python-distributions"]["path"]
+    assert "dist/*.tar.gz" in uploads["python-distributions"]["path"]
+    assert "zip" not in uploads["python-distributions"]["path"]
+    assert uploads["python-distributions"]["if-no-files-found"] == "error"
 
 
 def test_release_workflow_only_publishes_completed_build_artifacts():
@@ -46,3 +52,25 @@ def test_release_workflow_only_publishes_completed_build_artifacts():
     publish_command = next(step["run"] for step in steps if "run" in step)
     assert 'gh release upload "${RELEASE_TAG}" dist/*' in publish_command
     assert "--clobber" in publish_command
+
+
+def test_pypi_publish_uses_guarded_trusted_publishing():
+    publish = load_workflow()["jobs"]["publish-pypi"]
+
+    assert publish["needs"] == "build"
+    assert "github.event_name == 'release'" in publish["if"]
+    assert "vars.PYPI_PUBLISH_ENABLED == 'true'" in publish["if"]
+    assert publish["environment"] == {"name": "pypi"}
+    assert publish["permissions"] == {"id-token": "write"}
+
+    download = next(
+        step
+        for step in publish["steps"]
+        if step.get("uses") == "actions/download-artifact@v4"
+    )
+    assert download["with"]["name"] == "python-distributions"
+    assert download["with"]["path"] == "dist/"
+    assert any(
+        step.get("uses") == "pypa/gh-action-pypi-publish@release/v1"
+        for step in publish["steps"]
+    )

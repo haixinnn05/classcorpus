@@ -6,6 +6,8 @@
 
 - Build and smoke-test versioned Python distributions and a complete Agent
   Skill zip, then attach them automatically to future GitHub Releases.
+- Prepare guarded PyPI trusted publishing with public package metadata and
+  release setup documentation.
 
 ## 0.5.0 - 2026-07-24
 

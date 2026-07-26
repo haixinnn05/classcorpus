@@ -1,13 +1,36 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "classcorpus"
 version = "0.5.0"
 description = "Search local lecture folders with exact citations"
-readme = "SKILL.md"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "Jackson Wu" },
+]
+keywords = [
+    "agent-skill",
+    "education",
+    "lecture-notes",
+    "local-first",
+    "retrieval",
+    "study-tools",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+]
 dependencies = [
     "PyMuPDF>=1.24,<2",
     "python-docx>=1.2,<2",
@@ -42,6 +65,13 @@ pdf = [
     "Pillow>=10,<14",
     "reportlab>=4,<5",
 ]
+
+[project.urls]
+Homepage = "https://github.com/haixinnn05/classcorpus"
+Documentation = "https://github.com/haixinnn05/classcorpus#readme"
+Repository = "https://github.com/haixinnn05/classcorpus"
+Issues = "https://github.com/haixinnn05/classcorpus/issues"
+Changelog = "https://github.com/haixinnn05/classcorpus/blob/main/CHANGELOG.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
