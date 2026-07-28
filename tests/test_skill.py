@@ -184,9 +184,19 @@ def test_skill_and_public_docs_define_unified_cli(skill_text: str):
     assert "classcorpus read COURSE SOURCE ORDINAL" in cli_text
     assert "classcorpus inspect COURSE SOURCE ORDINAL" in cli_text
     assert "classcorpus inspect COURSE SOURCE ORDINAL" in skill_text
-    assert ".venv/bin/classcorpus doctor" in readme
-    assert ".venv/bin/classcorpus read" in readme
-    assert ".venv/bin/classcorpus inspect" in readme
+    assert "classcorpus doctor" in readme
+    assert "classcorpus demo" in readme
+    assert "classcorpus demo" in cli_text
+
+    retrieval_guide = ROOT / "docs/retrieval-guide.md"
+    assert retrieval_guide.is_file()
+    guide_text = retrieval_guide.read_text(encoding="utf-8")
+    assert "classcorpus retrieve" in guide_text
+    assert "classcorpus read" in guide_text
+    assert "classcorpus inspect" in guide_text
+    assert "classcorpus outline" in guide_text
+    assert "verify-artifact" in guide_text
+    assert retrieval_guide.name in readme
 
 
 def test_skill_keeps_typo_suggestions_explicit(skill_text: str):

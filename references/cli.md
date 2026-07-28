@@ -3,9 +3,14 @@
 The installed `classcorpus` command is the human-facing entry point. Existing
 scripts remain stable agent-facing JSON contracts.
 
+`python -m classcorpus` accepts identical arguments. Prefer it when a moved or
+renamed environment has broken the generated console script.
+
 ## Core Commands
 
 ```text
+classcorpus demo [--course COURSE] [--dir PATH] [--query QUERY] \
+  [--overwrite] [--json]
 classcorpus add COURSE SOURCE_ROOT [--json]
 classcorpus list [--json]
 classcorpus sync COURSE [--json]
@@ -26,6 +31,25 @@ classcorpus outline COURSE [--source PATH] [--cursor CURSOR] \
 classcorpus status [--course COURSE] [--json]
 classcorpus doctor [--json]
 ```
+
+## Demo
+
+`demo` generates a small synthetic course from code, indexes it, and runs one
+search, so ClassCorpus can be evaluated without any course files. It needs no
+network access and no model download.
+
+Generated files default to a `demo-course` folder inside the generated-data
+directory, never inside a lecture folder. `--dir` selects another location.
+`demo` refuses to write into an existing non-empty directory that it did not
+generate unless `--overwrite` is explicit, so it cannot overwrite real course
+material. Re-running it is safe.
+
+JSON output reports `generated_files`, the `sync` report, the `query`, a standard
+compact `search` payload, and `next_steps`.
+
+`classcorpus remove "ClassCorpus Demo" --confirm` deletes the demo index. The
+generated files stay on disk, because `remove` never deletes a course source
+folder; delete the reported `source_root` to remove them.
 
 ## Course Lifecycle
 
@@ -155,3 +179,11 @@ Sentence-transformers, FastEmbed, the Python OCR adapter, and the Tesseract
 executable are optional checks. Their absence is reported with installation
 guidance but does not fail the command. A required failure makes `ok` false and
 the process exits nonzero.
+
+The console entry point is also checked but is not required. Moving or renaming
+an environment leaves the generated `classcorpus` script pointing at an
+interpreter that no longer exists, which fails before any ClassCorpus code runs.
+Both generated script forms are inspected: a direct shebang, and the `/bin/sh`
+trampoline used when the interpreter path contains a space. A broken script is
+reported as `fail` with repair instructions, and `python -m classcorpus`
+continues to work in the meantime.
