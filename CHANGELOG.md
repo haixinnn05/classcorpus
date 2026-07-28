@@ -2,12 +2,30 @@
 
 ## Unreleased
 
+## 0.5.1 - 2026-07-28
+
 ### Added
 
+- Evaluate ClassCorpus without any course files using `classcorpus demo`, which
+  generates a small synthetic course from code, indexes it, and runs one cited
+  search. It needs no network access or model download, writes outside lecture
+  folders, and refuses to overwrite a directory it did not generate.
+- Detect a generated `classcorpus` script whose recorded interpreter no longer
+  exists, which happens when an environment is moved or renamed. `doctor` now
+  reports the repair, and `python -m classcorpus` is documented as the
+  invocation that keeps working.
 - Build and smoke-test versioned Python distributions and a complete Agent
   Skill zip, then attach them automatically to future GitHub Releases.
 - Prepare guarded PyPI trusted publishing with public package metadata and
   release setup documentation.
+
+### Changed
+
+- Restructure the README around the value proposition, a one-command trial, and
+  installation, and move the detailed retrieval, coverage, verification, and
+  provenance walkthrough into `docs/retrieval-guide.md`.
+- Document explicit update steps for both the published package and the cloned
+  Agent Skill.
 
 ## 0.5.0 - 2026-07-24
 
