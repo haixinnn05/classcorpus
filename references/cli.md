@@ -183,7 +183,10 @@ the process exits nonzero.
 The console entry point is also checked but is not required. Moving or renaming
 an environment leaves the generated `classcorpus` script pointing at an
 interpreter that no longer exists, which fails before any ClassCorpus code runs.
-Both generated script forms are inspected: a direct shebang, and the `/bin/sh`
+Both text script forms are inspected: a direct shebang, and the `/bin/sh`
 trampoline used when the interpreter path contains a space. A broken script is
 reported as `fail` with repair instructions, and `python -m classcorpus`
 continues to work in the meantime.
+
+On Windows the entry point is a `classcorpus.exe` wrapper with no readable
+shebang, so the check confirms only that the executable exists.

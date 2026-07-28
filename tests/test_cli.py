@@ -667,16 +667,19 @@ def test_doctor_accepts_a_console_script_whose_interpreter_exists(
     assert check["required"] is False
 
 
+MISSING_INTERPRETER = "/nonexistent/environment/bin/python"
+
+
 @pytest.mark.parametrize(
     "script_body",
     [
         pytest.param(
-            "#!/nonexistent/environment/bin/python\nfrom classcorpus.cli import main\n",
+            f"#!{MISSING_INTERPRETER}\nfrom classcorpus.cli import main\n",
             id="direct-shebang",
         ),
         pytest.param(
             "#!/bin/sh\n"
-            "'''exec' '/nonexistent/environment/bin/python' \"$0\" \"$@\"\n"
+            f"'''exec' '{MISSING_INTERPRETER}' \"$0\" \"$@\"\n"
             "' '''\nfrom classcorpus.cli import main\n",
             id="posix-shell-trampoline",
         ),
@@ -700,7 +703,8 @@ def test_doctor_detects_a_console_script_with_a_missing_interpreter(
     ]
 
     assert check["status"] == "fail"
-    assert "/nonexistent/environment/bin/python" in check["message"]
+    # The reported path is rendered with the platform separator.
+    assert str(Path(MISSING_INTERPRETER)) in check["message"]
     assert "python -m classcorpus" in check["action"]
     assert payload["ok"] is True, "a broken script must not fail required checks"
 
