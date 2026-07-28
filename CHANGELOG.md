@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.1 - 2026-07-28
+
 ### Fixed
 
 - Group multi-token exponents in typeset mathematics. `n^log_b(a)` rendered as
