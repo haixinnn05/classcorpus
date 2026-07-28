@@ -2,22 +2,39 @@
 
 ## Unreleased
 
+## 0.6.0 - 2026-07-28
+
 ### Added
 
 - Install the complete Agent Skill from a package install with
   `classcorpus install-skill`. Published distributions now carry `SKILL.md`,
   `references/`, and `scripts/`, so `pipx install classcorpus` followed by one
   command produces a working skill directory for Claude Code or Codex. Previously
-  only a clone could serve as a skill. With no arguments it installs for every
-  detected agent. Directory assets are replaced rather than merged, and replacing
-  an unrelated directory requires `--overwrite`.
+  only a clone could serve as a skill, because nine of the seventeen agent-facing
+  scripts have no CLI equivalent. With no arguments it installs for every detected
+  agent. Directory assets are replaced rather than merged, and replacing an
+  unrelated directory requires `--overwrite`.
 - Verify in release CI that the built wheel installs a complete, runnable skill,
   and that `classcorpus demo` works from that wheel.
+- Add a security policy, code of conduct, pull-request template, and Dependabot
+  configuration, with tests that assert they exist and that every GitHub
+  configuration file parses.
 
 ### Changed
 
 - Describe both supported interpreters in `SKILL.md`: a cloned skill's `.venv`,
   and any environment where ClassCorpus is installed as a package.
+- Replace the roadmap with work that is wanted but not yet done, so contributors
+  can see where to help.
+- Document the release runbook's ordering requirement: confirm the trusted
+  publisher was saved before enabling publishing, and use the dry run first.
+
+### Removed
+
+- Stop tracking 7.2 MB of local scratch and generated study artifacts, which
+  nothing referenced. Tracked content drops from 8.6 MB to 1.4 MB, and the Agent
+  Skill archive from 6.8 MB to 644 KB. Regenerate equivalents with
+  `classcorpus demo`, the scripts in `scripts/`, or the benchmark runner.
 
 ## 0.5.1 - 2026-07-28
 
