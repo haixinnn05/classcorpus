@@ -1,0 +1,11 @@
+front	back	citation	tags
+What is the purpose of dimensional analysis?	To check whether terms joined by addition or equality have compatible dimensions.	[PHYS1401, PHYS1401_Lecture01_002.pdf, Page 27]	"[""lecture-01"",""units""]"
+What does average velocity use in its numerator?	Displacement, not total distance.	[PHYS1401, PHYS1401_Lecture02_002.pdf, Page 10]	"[""lecture-02"",""velocity""]"
+How is instantaneous velocity defined?	As the derivative of position with respect to time.	[PHYS1401, PHYS1401_Lecture02_002.pdf, Page 15]	"[""lecture-02"",""derivatives""]"
+How is instantaneous acceleration related to position?	It is the second derivative of position with respect to time.	[PHYS1401, PHYS1401_Lecture02_002.pdf, Page 22]	"[""lecture-02"",""acceleration""]"
+What does the slope of a position-time graph represent?	Instantaneous velocity.	[PHYS1401, PHYS1401_Lecture03_002.pdf, Page 9]	"[""lecture-03"",""graphs""]"
+What does the slope of a velocity-time graph represent?	Acceleration.	[PHYS1401, PHYS1401_Lecture03_002.pdf, Page 12]	"[""lecture-03"",""graphs""]"
+What does the area under an acceleration-time curve represent?	The change in velocity over that interval.	[PHYS1401, PHYS1401_Lecture03_002.pdf, Page 14]	"[""lecture-03"",""integrals""]"
+When may the standard kinematic equations be used?	When acceleration is constant.	[PHYS1401, PHYS1401_Lecture04_002.pdf, Page 12]	"[""lecture-04"",""kinematics""]"
+What acceleration magnitude is used for free fall near Earth's surface?	9.8 meters per second squared, directed toward Earth's center.	[PHYS1401, PHYS1401_Lecture04_002.pdf, Page 19]	"[""lecture-04"",""free-fall""]"
+How are vectors added using components?	Add corresponding x components and corresponding y components.	[PHYS1401, PHYS1401_Lecture05_002.pdf, Page 15]	"[""lecture-05"",""vectors""]"

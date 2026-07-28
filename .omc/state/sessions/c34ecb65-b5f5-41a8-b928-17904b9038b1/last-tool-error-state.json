@@ -1,0 +1,7 @@
+{
+  "tool_name": "WebFetch",
+  "tool_input_preview": "{\"url\":\"https://feltron.com\",\"prompt\":\"Describe the site and whether the annual reports visualize places/travel/journeys. Any map treatments?\"}",
+  "error": "read ECONNRESET",
+  "timestamp": "2026-07-26T03:27:08.213Z",
+  "retry_count": 1
+}
