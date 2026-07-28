@@ -22,10 +22,19 @@ Do not enable the repository variable until the trusted publisher exists.
    | Environment | `pypi` |
 
 4. In the GitHub repository, create an environment named `pypi`.
-5. Add the repository variable `PYPI_PUBLISH_ENABLED` with the value `true`.
+5. **Confirm the publisher was saved.** Reload the PyPI publishing settings and
+   check that the entry appears under *Pending publishers* with all five values
+   exactly as entered. A form that failed to submit looks identical to one that
+   was never filled in, and the release will fail with `invalid-publisher`.
+6. Only then add the repository variable `PYPI_PUBLISH_ENABLED` with the value
+   `true`.
 
 Keep the variable absent or set to `false` until setup is complete. The PyPI
 job is skipped by default, while GitHub Release assets continue to publish.
+
+The environment name in the workflow, the environment in GitHub, and the
+environment recorded on PyPI must all match exactly. On failure the action prints
+the claims GitHub actually sent; compare them field by field with the publisher.
 
 ## Publish A Release
 
@@ -46,5 +55,13 @@ job is skipped by default, while GitHub Release assets continue to publish.
    archive, and Agent Skill zip. Once enabled, also confirm the PyPI job and
    the project page on PyPI.
 
+Use `gh workflow run release.yml` first for a dry run. The `workflow_dispatch`
+trigger builds and smoke-tests every artifact while skipping both publish jobs,
+so a broken build is caught before a version is spent.
+
 Never reuse a published version. If a release fails after PyPI accepts its
 files, increment the package version before trying again.
+
+If PyPI rejects the token exchange, no files were uploaded and the version is
+still free: fix the publisher, then `gh run rerun RUN_ID --failed` to retry the
+same version using the artifacts already built.
