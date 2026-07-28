@@ -644,6 +644,84 @@ def test_doctor_turns_unusable_data_path_into_failed_checks(
     assert checks["Database"]["status"] == "fail"
 
 
+def test_doctor_accepts_a_console_script_whose_interpreter_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    script = tmp_path / "classcorpus"
+    script.write_text(
+        f"#!{sys.executable}\nfrom classcorpus.cli import main\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "classcorpus.diagnostics._console_script_path",
+        lambda: script,
+    )
+
+    payload = doctor_report()
+    check = {item["name"]: item for item in payload["checks"]}[
+        "Console entry point"
+    ]
+
+    assert check["status"] == "pass"
+    assert check["required"] is False
+
+
+@pytest.mark.parametrize(
+    "script_body",
+    [
+        pytest.param(
+            "#!/nonexistent/environment/bin/python\nfrom classcorpus.cli import main\n",
+            id="direct-shebang",
+        ),
+        pytest.param(
+            "#!/bin/sh\n"
+            "'''exec' '/nonexistent/environment/bin/python' \"$0\" \"$@\"\n"
+            "' '''\nfrom classcorpus.cli import main\n",
+            id="posix-shell-trampoline",
+        ),
+    ],
+)
+def test_doctor_detects_a_console_script_with_a_missing_interpreter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    script_body: str,
+):
+    script = tmp_path / "classcorpus"
+    script.write_text(script_body, encoding="utf-8")
+    monkeypatch.setattr(
+        "classcorpus.diagnostics._console_script_path",
+        lambda: script,
+    )
+
+    payload = doctor_report()
+    check = {item["name"]: item for item in payload["checks"]}[
+        "Console entry point"
+    ]
+
+    assert check["status"] == "fail"
+    assert "/nonexistent/environment/bin/python" in check["message"]
+    assert "python -m classcorpus" in check["action"]
+    assert payload["ok"] is True, "a broken script must not fail required checks"
+
+
+def test_doctor_reports_an_absent_console_script_as_optional(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        "classcorpus.diagnostics._console_script_path",
+        lambda: None,
+    )
+
+    payload = doctor_report()
+    check = {item["name"]: item for item in payload["checks"]}[
+        "Console entry point"
+    ]
+
+    assert check["status"] == "optional"
+    assert "python -m classcorpus" in check["action"]
+
+
 def test_installed_console_entry_point_runs_doctor(tmp_path: Path):
     executable_name = "classcorpus.exe" if os.name == "nt" else "classcorpus"
     executable = Path(sysconfig.get_path("scripts")) / executable_name

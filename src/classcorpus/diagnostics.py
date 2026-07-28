@@ -3,9 +3,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import importlib.util
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import re
 import shutil
 import sqlite3
 import sys
+import sysconfig
 import tempfile
 
 from classcorpus.database import Database
@@ -28,6 +31,7 @@ def doctor_report() -> dict[str, object]:
         _fts_check(),
         _data_directory_check(),
         _database_check(),
+        _console_entry_point_check(),
         _optional_module_check(
             "sentence-transformers",
             "sentence_transformers",
@@ -134,6 +138,98 @@ def _database_check() -> DiagnosticCheck:
         required=True,
         message=f"Ready: {database_path()}",
     )
+
+
+def _console_entry_point_check() -> DiagnosticCheck:
+    """Detect a `classcorpus` script whose recorded interpreter no longer exists.
+
+    Renaming or moving an environment leaves the generated script pointing at a
+    missing interpreter, which fails before any ClassCorpus code can run. The
+    module invocation keeps working, so report the repair instead of guessing.
+    """
+    script = _console_script_path()
+    fallback = "Run ClassCorpus as `python -m classcorpus` until this is repaired."
+    if script is None:
+        return DiagnosticCheck(
+            name="Console entry point",
+            status="optional",
+            required=False,
+            message="The `classcorpus` script is not in this environment.",
+            action=f"Install the package to create it. {fallback}",
+        )
+
+    interpreter = _script_interpreter(script)
+    if interpreter is not None and not interpreter.exists():
+        return DiagnosticCheck(
+            name="Console entry point",
+            status="fail",
+            required=False,
+            message=(
+                f"{script} points at a missing interpreter: {interpreter}. The "
+                "environment was most likely moved or renamed."
+            ),
+            action=(
+                "Recreate the environment and reinstall: "
+                "python3 -m venv .venv && .venv/bin/python -m pip install -e . "
+                f"{fallback}"
+            ),
+        )
+    return DiagnosticCheck(
+        name="Console entry point",
+        status="pass",
+        required=False,
+        message=f"Ready: {script}",
+    )
+
+
+def _console_script_path() -> Path | None:
+    scripts_directory = sysconfig.get_path("scripts")
+    if scripts_directory:
+        for name in ("classcorpus", "classcorpus.exe"):
+            candidate = Path(scripts_directory) / name
+            if candidate.exists():
+                return candidate
+    located = shutil.which("classcorpus")
+    return Path(located) if located else None
+
+
+def _script_interpreter(script: Path) -> Path | None:
+    """Return the interpreter a generated script will run, or None if unknown.
+
+    Handles both script forms produced by installers: a direct shebang, and the
+    `/bin/sh` trampoline used when the interpreter path contains a space.
+    """
+    try:
+        with script.open("rb") as stream:
+            head = stream.read(4_096)
+    except OSError:
+        return None
+    if not head.startswith(b"#!"):
+        return None
+
+    lines = head.decode("utf-8", errors="replace").splitlines()
+    shebang = lines[0][2:].strip()
+    if not shebang:
+        return None
+    interpreter = _unquote_path(shebang)
+    if interpreter is not None and interpreter.name in _POSIX_SHELLS:
+        trampoline = _TRAMPOLINE_PATTERN.search(lines[1] if len(lines) > 1 else "")
+        if trampoline is not None:
+            return Path(trampoline.group("path"))
+    return interpreter
+
+
+def _unquote_path(value: str) -> Path | None:
+    if value.startswith(("'", '"')):
+        quote = value[0]
+        closing = value.find(quote, 1)
+        return Path(value[1:closing]) if closing != -1 else None
+    token = value.split(" ", 1)[0]
+    return Path(token) if token else None
+
+
+_POSIX_SHELLS = frozenset({"sh", "bash", "dash", "zsh"})
+_TRAMPOLINE_PATTERN = re.compile(r"""exec'\s+(?P<quote>['"])(?P<path>.+?)(?P=quote)""")
 
 
 def _optional_module_check(
