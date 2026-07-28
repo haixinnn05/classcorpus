@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Fixed
+
+- Group multi-token exponents in typeset mathematics. `n^log_b(a)` rendered as
+  `n` with a superscript `log` and a subscript `b` followed by `(a)`, rather than
+  `n` raised to `log_b(a)`. That is the master-theorem expression, so it appeared
+  in ordinary algorithms study guides. `e^-x` and `n^12` are also corrected, while
+  `x^2_i` keeps its superscript-then-subscript meaning.
+- Typeset capital Greek names that were missing while others were present, so
+  `Theta(n log n)` no longer renders literally. Adds Theta, Pi, Psi, Xi, and
+  Upsilon.
+- Name the guide and course on the PDF study-guide cover. The renderer omitted
+  the document's level-one heading from the body but never passed it to the
+  cover, so the title was discarded and every guide read `COURSE` / `Study Guide`
+  in its cover, running header, and footer. The title now defaults to that
+  heading and the course label to the course named by the document's citations.
+
 ## 0.6.0 - 2026-07-28
 
 ### Added
