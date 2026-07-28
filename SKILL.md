@@ -10,16 +10,17 @@ write; use bundled commands for deterministic indexing and retrieval.
 
 ## Setup
 
-Set `SKILL_DIR` to this file's directory. Use:
+`SKILL_DIR` is this file's directory. Prefix every `scripts/SCRIPT.py` below
+with the interpreter that has ClassCorpus installed:
 
 ```text
-Unix/macOS: "$SKILL_DIR/.venv/bin/python" "$SKILL_DIR/scripts/SCRIPT.py"
-Windows:    "$SKILL_DIR\.venv\Scripts\python.exe" "$SKILL_DIR\scripts\SCRIPT.py"
+Cloned:    "$SKILL_DIR/.venv/bin/python" ("$SKILL_DIR\.venv\Scripts\python.exe")
+Installed: python, with `classcorpus` on PATH
 ```
 
-If missing, see README. Run `.venv/bin/classcorpus doctor --json`; inspect
-coverage with
-`.venv/bin/classcorpus status --course "COURSE" --json`. See
+If neither works, see README. Run `classcorpus doctor --json`, or
+`python -m classcorpus doctor --json`; inspect coverage with
+`classcorpus status --course "COURSE" --json`. See
 [CLI details](references/cli.md).
 
 ## Evidence Workflow
