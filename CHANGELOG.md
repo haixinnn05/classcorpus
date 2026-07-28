@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added
+
+- Install the complete Agent Skill from a package install with
+  `classcorpus install-skill`. Published distributions now carry `SKILL.md`,
+  `references/`, and `scripts/`, so `pipx install classcorpus` followed by one
+  command produces a working skill directory for Claude Code or Codex. Previously
+  only a clone could serve as a skill. With no arguments it installs for every
+  detected agent. Directory assets are replaced rather than merged, and replacing
+  an unrelated directory requires `--overwrite`.
+- Verify in release CI that the built wheel installs a complete, runnable skill,
+  and that `classcorpus demo` works from that wheel.
+
+### Changed
+
+- Describe both supported interpreters in `SKILL.md`: a cloned skill's `.venv`,
+  and any environment where ClassCorpus is installed as a package.
+
 ## 0.5.1 - 2026-07-28
 
 ### Added

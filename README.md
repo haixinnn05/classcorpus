@@ -74,19 +74,30 @@ answer keys back to the source lectures.
 Requires Python 3.11 or newer. Baseline indexing and search need no model
 download.
 
-### As A Command-Line Tool
+### From PyPI
 
 ```bash
 pipx install classcorpus
+classcorpus install-skill
 ```
+
+The first command installs the CLI and library. The second copies the skill
+itself — `SKILL.md`, `references/`, and `scripts/` — into your agent's skills
+directory, so the agent can discover it. Restart or reload the agent afterwards.
 
 `uv tool install classcorpus` and `pip install classcorpus` also work.
 
-### As An Agent Skill
+`install-skill` detects Claude Code and Codex from `~/.claude` and `~/.codex`,
+and installs for every agent it finds. Narrow it with `--agent claude` or
+`--agent codex`, or choose any other location with `--target DIRECTORY`. It
+refuses to replace a directory it did not install unless you pass `--overwrite`.
 
-**ClassCorpus is an Agent Skill, not an application.** Clone it to the skill
-location your agent uses. Only ClassCorpus code goes here; lecture materials stay
-in their existing folders.
+### From A Clone
+
+**ClassCorpus is an Agent Skill, not an application.** Cloning straight to the
+skill location also works, and is the better option if you want to modify it.
+Only ClassCorpus code goes here; lecture materials stay in their existing
+folders.
 
 Codex:
 
@@ -135,6 +146,7 @@ Installed from PyPI:
 
 ```bash
 pipx upgrade classcorpus     # or: uv tool upgrade classcorpus
+classcorpus install-skill    # refresh the installed skill files
 ```
 
 Installed as a cloned skill:

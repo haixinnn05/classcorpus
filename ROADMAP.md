@@ -11,13 +11,10 @@ approach can be agreed before code is written. See
 
 ## Distribution
 
-- **Install the skill from the published package.** `pip install classcorpus`
-  currently delivers the CLI and library only. `SKILL.md`, `references/`, and
-  `scripts/` are not packaged, so an agent cannot discover the skill from a PyPI
-  install. Package those files as data and add a command that copies them into
-  the agent's skills directory, so onboarding becomes install plus one command.
 - **Publish a Claude Code plugin manifest** so the skill is installable from the
   plugin marketplace.
+- **Support more agents in `install-skill`.** Only Claude Code and Codex skill
+  directories are known. Adding an agent should require one table entry.
 
 ## Formats
 
@@ -62,6 +59,8 @@ approach can be agreed before code is written. See
 
 ## Completed
 
+- Installed the complete Agent Skill from the published package with
+  `classcorpus install-skill`
 - Published to PyPI with OpenID Connect trusted publishing
 - Zero-setup evaluation with `classcorpus demo`
 - Diagnostics for a console script whose interpreter no longer exists

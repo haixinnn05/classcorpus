@@ -9,6 +9,8 @@ renamed environment has broken the generated console script.
 ## Core Commands
 
 ```text
+classcorpus install-skill [--agent {claude,codex}] [--target PATH] \
+  [--overwrite] [--json]
 classcorpus demo [--course COURSE] [--dir PATH] [--query QUERY] \
   [--overwrite] [--json]
 classcorpus add COURSE SOURCE_ROOT [--json]
@@ -31,6 +33,28 @@ classcorpus outline COURSE [--source PATH] [--cursor CURSOR] \
 classcorpus status [--course COURSE] [--json]
 classcorpus doctor [--json]
 ```
+
+## Install Skill
+
+`install-skill` copies `SKILL.md`, `references/`, and `scripts/` into an agent's
+skills directory, so a package install can act as an Agent Skill. A published
+wheel carries these files under `classcorpus/_skill/`; a source or editable
+checkout uses the repository root instead.
+
+The destination is `AGENT_HOME/skills/classcorpus`, where the agent home comes
+from `CLAUDE_HOME` or `CODEX_HOME` when set, and otherwise `~/.claude` or
+`~/.codex`. An agent is detected when its home directory exists.
+
+With no arguments, the skill is installed for **every** detected agent, since a
+user running both Claude Code and Codex wants it in both. `--agent` narrows that
+to one, and `--target` installs into an exact directory instead. When no agent is
+detected, the command fails and names both options. JSON output reports one entry
+per destination under `installations`.
+
+Directory assets are replaced rather than merged, so files removed in a later
+version do not linger. Reinstalling over a previous ClassCorpus skill is allowed;
+replacing an unrelated directory requires `--overwrite`. Restart or reload the
+agent afterwards so it rediscovers `SKILL.md`.
 
 ## Demo
 
