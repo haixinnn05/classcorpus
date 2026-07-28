@@ -41,7 +41,7 @@ from classcorpus.math_notation import (
     normalize_math_expression,
     strip_display_math_delimiters,
 )
-from classcorpus.provenance import write_artifact_manifest
+from classcorpus.provenance import CITATION_PATTERN, write_artifact_manifest
 
 PAGE_LABEL = "STUDY GUIDE"
 FOOTER_LABEL = "COURSE MATERIALS"
@@ -594,6 +594,31 @@ def page_decor(canvas, doc) -> None:
     canvas.restoreState()
 
 
+def document_title(source_text: str) -> str | None:
+    """Return the document's first level-one heading, which the body omits."""
+    for line in source_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            return stripped[2:].strip() or None
+    return None
+
+
+def cited_course(source_text: str) -> str | None:
+    """Return the course named by the document's citations, when they agree.
+
+    Citations look like `[Course, lecture.pdf, Page 3]`, so the course is already
+    written into the guide and does not need to be passed again.
+    """
+    courses = {
+        citation.lstrip("[").split(",", 1)[0].strip()
+        for citation in CITATION_PATTERN.findall(source_text)
+    }
+    courses.discard("")
+    if len(courses) == 1:
+        return courses.pop()
+    return None
+
+
 def main() -> None:
     global FOOTER_LABEL, PAGE_LABEL
     parser = argparse.ArgumentParser(
@@ -601,9 +626,15 @@ def main() -> None:
     )
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--title", default="Study Guide")
+    parser.add_argument(
+        "--title",
+        help="Cover title. Defaults to the document's first heading.",
+    )
     parser.add_argument("--subtitle", default="Evidence-grounded course review")
-    parser.add_argument("--course-label", default="COURSE")
+    parser.add_argument(
+        "--course-label",
+        help="Cover, header, and footer label. Defaults to the cited course.",
+    )
     parser.add_argument(
         "--stat",
         action="append",
@@ -614,8 +645,15 @@ def main() -> None:
     stats_values = arguments.stat or ["Cited concepts", "Formula review", "Practice set"]
     if len(stats_values) > 3:
         parser.error("--stat may be repeated at most three times")
-    PAGE_LABEL = f"{arguments.course_label} STUDY GUIDE".upper()
-    FOOTER_LABEL = arguments.course_label.upper()
+
+    source_text = arguments.source.read_text(encoding="utf-8")
+    # The body omits the level-one heading, so use it as the cover title, and
+    # take the course from the citations already written into the guide.
+    title = arguments.title or document_title(source_text) or "Study Guide"
+    course_label = arguments.course_label or cited_course(source_text) or "COURSE"
+
+    PAGE_LABEL = f"{course_label} STUDY GUIDE".upper()
+    FOOTER_LABEL = course_label.upper()
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
 
     st = styles()
@@ -626,16 +664,15 @@ def main() -> None:
         leftMargin=0.65 * inch,
         topMargin=0.55 * inch,
         bottomMargin=0.62 * inch,
-        title=f"{arguments.course_label} {arguments.title}",
+        title=title if title.startswith(course_label) else f"{course_label} {title}",
         author="ClassCorpus",
         subject="Evidence-grounded course study guide",
     )
-    source_text = arguments.source.read_text(encoding="utf-8")
     story = cover(
         st,
-        title=arguments.title,
+        title=title,
         subtitle=arguments.subtitle,
-        course_label=arguments.course_label,
+        course_label=course_label,
         stats_values=stats_values,
     )
     story.extend(markdown_story(source_text, st))

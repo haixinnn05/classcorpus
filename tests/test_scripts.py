@@ -855,6 +855,88 @@ def test_study_guide_renderer_creates_provenance_sidecar(tmp_path: Path):
     ] == ["[Physics 1, waves.pdf, Page 4]"]
 
 
+def test_study_guide_uses_the_document_title_and_cited_course(tmp_path: Path):
+    """Without flags, the cover must name the guide and course, not a placeholder."""
+    source = tmp_path / "guide.md"
+    output = tmp_path / "guide.pdf"
+    source.write_text(
+        "# Algorithms Exam 2 Study Guide\n\n"
+        "## Shortest Paths\n\n"
+        "Bellman-Ford tolerates negative weights. "
+        "[Algorithms, handout.pdf, Page 2]\n",
+        encoding="utf-8",
+    )
+
+    rendered = run_script(
+        "render_study_guide.py",
+        str(source),
+        str(output),
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    assert rendered.returncode == 0, rendered.stderr
+    text = _pdf_text(output)
+    assert "Algorithms Exam 2 Study Guide" in text
+    assert "Algorithms" in text
+    assert "COURSE" not in text
+
+
+def test_study_guide_flags_override_the_derived_title(tmp_path: Path):
+    source = tmp_path / "guide.md"
+    output = tmp_path / "guide.pdf"
+    source.write_text(
+        "# Ignored Heading\n\n"
+        "## Topic\n\nA claim. [Algorithms, handout.pdf, Page 1]\n",
+        encoding="utf-8",
+    )
+
+    rendered = run_script(
+        "render_study_guide.py",
+        str(source),
+        str(output),
+        "--title",
+        "Chosen Title",
+        "--course-label",
+        "Chosen Course",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    assert rendered.returncode == 0, rendered.stderr
+    text = _pdf_text(output)
+    assert "Chosen Title" in text
+    assert "Chosen Course" in text
+    assert "Ignored Heading" not in text
+
+
+def test_study_guide_falls_back_when_the_document_says_nothing(tmp_path: Path):
+    source = tmp_path / "guide.md"
+    output = tmp_path / "guide.pdf"
+    source.write_text("## No Level One Heading\n\nPlain prose.\n", encoding="utf-8")
+
+    rendered = run_script(
+        "render_study_guide.py",
+        str(source),
+        str(output),
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    assert rendered.returncode == 0, rendered.stderr
+    assert "Study Guide" in _pdf_text(output)
+
+
+def _pdf_text(path: Path) -> str:
+    import fitz
+
+    document = fitz.open(path)
+    try:
+        return "\n".join(page.get_text() for page in document)
+    finally:
+        document.close()
+
+
 @pytest.mark.parametrize(
     ("script", "arguments"),
     [

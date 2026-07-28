@@ -14,7 +14,7 @@ from classcorpus.database import Database
 
 MANIFEST_SUFFIX = ".classcorpus.json"
 MANIFEST_VERSION = 1
-_CITATION_PATTERN = re.compile(
+CITATION_PATTERN = re.compile(
     r"\[[^\]\n]+,\s*(?:Slide|Page)\s+\d+\]"
 )
 
@@ -154,7 +154,7 @@ def verify_artifact(
 
 def _extract_citations(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
-    return list(dict.fromkeys(_CITATION_PATTERN.findall(text)))
+    return list(dict.fromkeys(CITATION_PATTERN.findall(text)))
 
 
 def _resolve_citations(
@@ -235,6 +235,7 @@ def _package_version() -> str:
 
 
 __all__ = [
+    "CITATION_PATTERN",
     "MANIFEST_SUFFIX",
     "manifest_path",
     "verify_artifact",
