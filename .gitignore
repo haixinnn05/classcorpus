@@ -1,6 +1,7 @@
 .worktrees/
 .stfolder/
 .superpowers/
+.omc/
 .venv/
 .pytest_cache/
 .ruff_cache/
@@ -8,6 +9,13 @@ __pycache__/
 *.egg-info/
 .DS_Store
 .coverage
+coverage.xml
 htmlcov/
 build/
 dist/
+
+# Local scratch and generated study artifacts. Reproduce them with
+# `classcorpus demo`, the scripts in scripts/, or `python -m benchmarks.run`.
+tmp/
+output/
+*.classcorpus.json
