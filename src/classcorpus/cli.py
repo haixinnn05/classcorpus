@@ -9,6 +9,7 @@ import sys
 from typing import Any
 
 from classcorpus.database import Database, remove_course_data
+from classcorpus.demo import DEMO_COURSE_NAME, DEMO_QUERY, run_demo
 from classcorpus.diagnostics import doctor_report
 from classcorpus.encoders import create_encoder
 from classcorpus.indexer import sync_course
@@ -55,6 +56,26 @@ def build_parser() -> CLIArgumentParser:
         description="Index and search local course materials with exact citations.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    demo_parser = subparsers.add_parser(
+        "demo",
+        help="Generate, index, and search a synthetic course to try ClassCorpus.",
+    )
+    demo_parser.add_argument("--course", default=DEMO_COURSE_NAME)
+    demo_parser.add_argument(
+        "--dir",
+        dest="source_root",
+        type=Path,
+        help="Where to write the generated demo files. Defaults to generated data.",
+    )
+    demo_parser.add_argument("--query", default=DEMO_QUERY)
+    demo_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow writing demo files into an existing non-empty directory.",
+    )
+    _add_json_argument(demo_parser)
+    demo_parser.set_defaults(handler=_run_demo)
 
     add_parser = subparsers.add_parser(
         "add",
@@ -265,6 +286,40 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"Error: {error}", file=sys.stderr)
         return 1
+
+
+def _run_demo(arguments: argparse.Namespace) -> int:
+    payload = run_demo(
+        _database(),
+        course=arguments.course,
+        source_root=arguments.source_root,
+        query=arguments.query,
+        overwrite=arguments.overwrite,
+    )
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0 if payload["ok"] else 1
+
+    sync = payload["sync"]
+    print(f"Generated {len(payload['generated_files'])} demo files:")
+    for name in payload["generated_files"]:
+        print(f"  {name}")
+    print(f"Source folder: {payload['source_root']}")
+    print(
+        f"Indexed {sync['indexed']}, skipped {sync['skipped']}, "
+        f"failed {sync['failed']}; {sync['records_indexed']} records."
+    )
+    print(f'\nSearching "{payload["query"]}" in {payload["course"]}:\n')
+    for result in payload["search"]["results"]:
+        print(f"{result['citation']} {result['title'] or '(untitled)'}")
+        print(f"  {result['evidence']}\n")
+    if "error" in payload:
+        print(f"Error: {payload['error']['message']}", file=sys.stderr)
+        return 1
+    print("Every line above is a real citation into a real indexed file. Next:")
+    for step in payload["next_steps"]:
+        print(f"  {step}")
+    return 0
 
 
 def _run_index(arguments: argparse.Namespace) -> int:
