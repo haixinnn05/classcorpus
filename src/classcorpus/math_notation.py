@@ -60,6 +60,11 @@ _GREEK_NAMES = (
     "Sigma",
     "Phi",
     "Omega",
+    "Theta",
+    "Pi",
+    "Psi",
+    "Xi",
+    "Upsilon",
 )
 _INLINE_GREEK_SYMBOLS = {
     "alpha": "α",
@@ -140,7 +145,7 @@ def normalize_math_expression(text: str) -> str:
             rf"\\{name}",
             value,
         )
-    return value
+    return _brace_compound_exponents(value)
 
 
 def normalize_inline_math(text: str) -> str:
@@ -284,6 +289,86 @@ def _matrix_cell(value: str) -> str:
             + rf"{{{fraction.group('denominator')}}}"
         )
     return cell
+
+
+def _brace_compound_exponents(value: str) -> str:
+    """Group multi-token exponents so the whole expression is raised.
+
+    MathText raises only the token after `^`, so `n^\\mathrm{log}_b(a)` renders as
+    `n` with both a superscript and a subscript instead of `n` raised to
+    `log_b(a)`. Wrap an exponent that spans more than one token in braces.
+    """
+    pieces: list[str] = []
+    index = 0
+    while index < len(value):
+        character = value[index]
+        pieces.append(character)
+        index += 1
+        if character != "^" or index >= len(value) or value[index] == "{":
+            continue
+        end = _exponent_end(value, index)
+        exponent = value[index:end]
+        pieces.append(f"{{{exponent}}}" if len(exponent) > 1 else exponent)
+        index = end
+    return "".join(pieces)
+
+
+def _exponent_end(value: str, start: int) -> int:
+    """Return where the exponent beginning at `start` ends."""
+    index = start
+    if index < len(value) and value[index] in "+-":
+        index += 1
+    head_start = index
+    index = _atom_end(value, index)
+    head = value[head_start:index]
+    # A single-character head keeps LaTeX's `x^2_i` meaning: superscript then
+    # subscript. A longer head, such as a function name, takes what follows.
+    if len(head) <= 1:
+        return index
+    while index < len(value):
+        character = value[index]
+        if character == "_":
+            index = _atom_end(value, index + 1)
+            continue
+        if character in "({" or character.isalnum() or character == "\\":
+            index = _atom_end(value, index)
+            continue
+        break
+    return index
+
+
+def _atom_end(value: str, start: int) -> int:
+    """Return the end of one token: a command, a balanced group, or a run."""
+    index = start
+    if index >= len(value):
+        return index
+    character = value[index]
+    if character == "\\":
+        index += 1
+        while index < len(value) and value[index].isalpha():
+            index += 1
+        if index < len(value) and value[index] == "{":
+            return _balanced_end(value, index, "{", "}")
+        return index
+    if character == "{":
+        return _balanced_end(value, index, "{", "}")
+    if character == "(":
+        return _balanced_end(value, index, "(", ")")
+    while index < len(value) and value[index].isalnum():
+        index += 1
+    return index if index > start else start + 1
+
+
+def _balanced_end(value: str, start: int, opening: str, closing: str) -> int:
+    depth = 0
+    for index in range(start, len(value)):
+        if value[index] == opening:
+            depth += 1
+        elif value[index] == closing:
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return len(value)
 
 
 __all__ = [

@@ -106,3 +106,40 @@ def test_standalone_equations_are_detected_conservatively():
 def test_display_math_delimiters_are_removed():
     assert strip_display_math_delimiters("$$x^2 = 4$$") == "x^2 = 4"
     assert strip_display_math_delimiters(r"\[x^2 = 4\]") == "x^2 = 4"
+
+
+def test_compound_exponent_is_grouped():
+    """MathText raises only the next token, so a multi-token exponent needs braces."""
+    assert normalize_math_expression("n^log_b(a)") == r"n^{\mathrm{log}_b(a)}"
+    assert (
+        normalize_math_expression("T(n) = Theta(n^log_b(a) * log n)")
+        == r"T(n) = \Theta(n^{\mathrm{log}_b(a)} * \mathrm{log} n)"
+    )
+
+
+def test_capital_greek_complexity_classes_are_typeset():
+    """Big-Theta is core algorithms notation and was rendering literally."""
+    assert normalize_math_expression("Theta(n log n)") == r"\Theta(n \mathrm{log} n)"
+    assert normalize_math_expression("Omega(n)") == r"\Omega(n)"
+    assert normalize_math_expression("theta = 30") == r"\theta = 30"
+
+
+def test_multi_character_and_signed_exponents_are_grouped():
+    assert normalize_math_expression("n^12") == "n^{12}"
+    assert normalize_math_expression("e^-x") == "e^{-x}"
+    assert normalize_math_expression("x^(i+1)") == "x^{(i+1)}"
+
+
+def test_single_token_exponents_are_left_alone():
+    assert normalize_math_expression("n^2") == "n^2"
+    assert normalize_math_expression("2^n + 1") == "2^n + 1"
+    assert normalize_math_expression("a^b") == "a^b"
+
+
+def test_superscript_then_subscript_keeps_its_meaning():
+    """`x^2_i` is a superscript and a subscript, not an exponent of `2_i`."""
+    assert normalize_math_expression("x^2_i") == "x^2_i"
+
+
+def test_already_grouped_exponents_are_not_double_wrapped():
+    assert normalize_math_expression("n^{log_b a}") == r"n^{\mathrm{log}_b a}"
