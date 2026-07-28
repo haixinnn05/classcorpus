@@ -1,5 +1,6 @@
 # ClassCorpus
 
+[![PyPI](https://img.shields.io/pypi/v/classcorpus.svg)](https://pypi.org/project/classcorpus/)
 [![Test](https://github.com/haixinnn05/classcorpus/actions/workflows/test.yml/badge.svg)](https://github.com/haixinnn05/classcorpus/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/haixinnn05/classcorpus/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
