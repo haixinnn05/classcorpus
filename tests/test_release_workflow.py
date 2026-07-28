@@ -74,3 +74,27 @@ def test_pypi_publish_uses_guarded_trusted_publishing():
         step.get("uses") == "pypa/gh-action-pypi-publish@release/v1"
         for step in publish["steps"]
     )
+
+
+def test_every_github_configuration_file_is_valid_yaml():
+    directory = ROOT / ".github"
+    paths = sorted(directory.rglob("*.yml")) + sorted(directory.rglob("*.yaml"))
+
+    assert paths, "expected GitHub configuration files"
+    for path in paths:
+        loaded = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        assert isinstance(loaded, dict), path
+
+
+def test_dependabot_covers_actions_and_python_dependencies():
+    config = yaml.load(
+        (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+
+    assert config["version"] == "2"
+    ecosystems = {update["package-ecosystem"] for update in config["updates"]}
+    assert ecosystems == {"github-actions", "pip"}
+    for update in config["updates"]:
+        assert update["directory"] == "/"
+        assert update["schedule"]["interval"] in {"daily", "weekly", "monthly"}

@@ -1,0 +1,36 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "build"
+    labels:
+      - dependencies
+    open-pull-requests-limit: 5
+    groups:
+      optional-backends:
+        patterns:
+          - sentence-transformers
+          - fastembed
+          - numpy
+          - pytesseract
+      dev-tooling:
+        patterns:
+          - pytest
+          - ruff
+          - matplotlib
+          - Pillow
+          - PyYAML
+          - reportlab

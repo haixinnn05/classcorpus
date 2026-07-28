@@ -59,5 +59,13 @@ one-based ordinals, generated-data boundaries, and review reason codes.
 
 ## Reporting Security Or Privacy Issues
 
-Do not include sensitive lecture content in a public issue. Describe the
-behavior with a minimal synthetic reproduction.
+Report vulnerabilities privately through GitHub Security Advisories rather than a
+public issue. See [SECURITY.md](SECURITY.md) for the process and scope.
+
+Do not include sensitive lecture content in any report. Describe the behavior
+with a minimal synthetic reproduction; `classcorpus demo` and
+`benchmarks/generate.py` generate redistributable files.
+
+## Code Of Conduct
+
+Participation is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

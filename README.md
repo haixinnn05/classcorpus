@@ -321,7 +321,10 @@ normalized schema and output rules.
 | [docs/architecture.md](https://github.com/haixinnn05/classcorpus/blob/main/docs/architecture.md) | Design boundaries |
 | [docs/privacy.md](https://github.com/haixinnn05/classcorpus/blob/main/docs/privacy.md) | Data handling detail |
 | [benchmarks/README.md](https://github.com/haixinnn05/classcorpus/blob/main/benchmarks/README.md) | Corpus, metrics, benchmark contract |
-| [ROADMAP.md](https://github.com/haixinnn05/classcorpus/blob/main/ROADMAP.md) | Planned work |
+| [ROADMAP.md](https://github.com/haixinnn05/classcorpus/blob/main/ROADMAP.md) | Planned work and where to help |
+| [CONTRIBUTING.md](https://github.com/haixinnn05/classcorpus/blob/main/CONTRIBUTING.md) | Development setup and boundaries |
+| [SECURITY.md](https://github.com/haixinnn05/classcorpus/blob/main/SECURITY.md) | Reporting a vulnerability, and scope |
+| [CODE_OF_CONDUCT.md](https://github.com/haixinnn05/classcorpus/blob/main/CODE_OF_CONDUCT.md) | Community expectations |
 
 ## Repository Structure
 
@@ -347,6 +350,10 @@ python3 -m venv .venv
 
 Read [CONTRIBUTING.md](https://github.com/haixinnn05/classcorpus/blob/main/CONTRIBUTING.md) before proposing changes, and
 [docs/releasing.md](https://github.com/haixinnn05/classcorpus/blob/main/docs/releasing.md) for release and PyPI publishing steps.
+
+Contributions are welcome. [ROADMAP.md](https://github.com/haixinnn05/classcorpus/blob/main/ROADMAP.md)
+lists work that is wanted but not yet done; open an issue before starting a
+parser, storage, or workflow change so the approach can be agreed first.
 
 ## License
 

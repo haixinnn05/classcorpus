@@ -99,13 +99,20 @@ def test_open_source_repository_artifacts_exist():
     required = (
         "docs/architecture.md",
         "docs/privacy.md",
+        "docs/retrieval-guide.md",
         "ROADMAP.md",
+        "SECURITY.md",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
         ".github/ISSUE_TEMPLATE/bug_report.yml",
         ".github/ISSUE_TEMPLATE/feature_request.yml",
+        ".github/pull_request_template.md",
+        ".github/dependabot.yml",
         "examples/README.md",
     )
 
-    assert all((ROOT / relative_path).is_file() for relative_path in required)
+    missing = [path for path in required if not (ROOT / path).is_file()]
+    assert not missing, f"missing repository artifacts: {missing}"
 
 
 def test_reference_docs_define_exhaustive_read_contract():
