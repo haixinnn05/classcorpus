@@ -53,6 +53,25 @@ jobs:
           CLASSCORPUS_DATA_DIR=/tmp/classcorpus-smoke-data \
             /tmp/classcorpus-smoke/bin/classcorpus doctor --json
 
+      - name: Verify the wheel installs a complete Agent Skill
+        shell: bash
+        run: |
+          /tmp/classcorpus-smoke/bin/classcorpus install-skill \
+            --target /tmp/classcorpus-skill --json
+          test -f /tmp/classcorpus-skill/SKILL.md
+          test -f /tmp/classcorpus-skill/references/cli.md
+          test -f /tmp/classcorpus-skill/scripts/read_lectures.py
+          CLASSCORPUS_DATA_DIR=/tmp/classcorpus-smoke-data \
+            /tmp/classcorpus-smoke/bin/python \
+            /tmp/classcorpus-skill/scripts/read_lectures.py \
+            --course "Absent" --json
+
+      - name: Smoke-test the demo from the wheel
+        shell: bash
+        run: |
+          CLASSCORPUS_DATA_DIR=/tmp/classcorpus-demo-data \
+            /tmp/classcorpus-smoke/bin/classcorpus demo --json
+
       - uses: actions/upload-artifact@v4
         with:
           name: release-assets

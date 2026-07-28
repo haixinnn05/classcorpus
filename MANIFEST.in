@@ -1,0 +1,12 @@
+include SKILL.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include SECURITY.md
+include CODE_OF_CONDUCT.md
+include ROADMAP.md
+recursive-include references *.md
+recursive-include scripts *.py
+recursive-include docs *.md
+prune docs/superpowers
+global-exclude *.pyc
+global-exclude .DS_Store

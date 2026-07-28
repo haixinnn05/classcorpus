@@ -31,6 +31,7 @@ from classcorpus.retrieval import (
 )
 from classcorpus.search import search, suggest_terms
 from classcorpus.security import mark_untrusted_content
+from classcorpus.skill import AGENT_SKILL_ROOTS, install_skill
 from classcorpus.status import status_report
 
 
@@ -56,6 +57,28 @@ def build_parser() -> CLIArgumentParser:
         description="Index and search local course materials with exact citations.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    install_parser = subparsers.add_parser(
+        "install-skill",
+        help="Install the bundled Agent Skill into an agent's skills directory.",
+    )
+    install_parser.add_argument(
+        "--agent",
+        choices=sorted(AGENT_SKILL_ROOTS),
+        help="Which agent to install for. Detected when only one is present.",
+    )
+    install_parser.add_argument(
+        "--target",
+        type=Path,
+        help="Install into this exact directory instead of an agent's default.",
+    )
+    install_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace an existing directory that ClassCorpus did not install.",
+    )
+    _add_json_argument(install_parser)
+    install_parser.set_defaults(handler=_run_install_skill)
 
     demo_parser = subparsers.add_parser(
         "demo",
@@ -286,6 +309,29 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"Error: {error}", file=sys.stderr)
         return 1
+
+
+def _run_install_skill(arguments: argparse.Namespace) -> int:
+    payload = install_skill(
+        agent=arguments.agent,
+        target=arguments.target,
+        overwrite=arguments.overwrite,
+    )
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0
+
+    for installation in payload["installations"]:
+        verb = "Reinstalled" if installation["replaced_existing"] else "Installed"
+        label = f" for {installation['agent']}" if installation["agent"] else ""
+        print(
+            f"{verb} the ClassCorpus skill{label} "
+            f"({installation['installed_files']} files)."
+        )
+        print(f"  {installation['target']}")
+    for step in payload["next_steps"]:
+        print(step)
+    return 0
 
 
 def _run_demo(arguments: argparse.Namespace) -> int:
