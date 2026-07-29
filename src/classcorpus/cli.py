@@ -8,6 +8,7 @@ import shlex
 import sys
 from typing import Any
 
+from classcorpus.claims import DEFAULT_SUPPORT_THRESHOLD, check_claims
 from classcorpus.database import Database, remove_course_data
 from classcorpus.demo import DEMO_COURSE_NAME, DEMO_QUERY, run_demo
 from classcorpus.diagnostics import doctor_report
@@ -250,6 +251,25 @@ def build_parser() -> CLIArgumentParser:
     manifest_parser.add_argument("--overwrite", action="store_true")
     _add_json_argument(manifest_parser)
     manifest_parser.set_defaults(handler=_run_manifest)
+
+    claims_parser = subparsers.add_parser(
+        "check-claims",
+        help="Check whether cited claims are supported by the records they cite.",
+    )
+    claims_parser.add_argument("source", type=Path)
+    claims_parser.add_argument(
+        "--field",
+        choices=RECORD_TEXT_FIELDS,
+        default="searchable",
+    )
+    claims_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=DEFAULT_SUPPORT_THRESHOLD,
+        help="Minimum share of claim wording that must appear in the record.",
+    )
+    _add_json_argument(claims_parser)
+    claims_parser.set_defaults(handler=_run_check_claims)
 
     verify_parser = subparsers.add_parser(
         "verify-artifact",
@@ -703,6 +723,39 @@ def _run_manifest(arguments: argparse.Namespace) -> int:
     else:
         print(payload["manifest"])
     return 0
+
+
+def _run_check_claims(arguments: argparse.Namespace) -> int:
+    payload = check_claims(
+        _database(),
+        arguments.source,
+        field=arguments.field,
+        threshold=arguments.threshold,
+    )
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0 if payload["ok"] else 1
+
+    counts = payload["counts"]
+    if not payload["claims_total"]:
+        print(payload["message"])
+        return 0
+    print(
+        f"{payload['claims_total']} cited claims: "
+        f"{counts['supported']} supported, {counts['weak']} weak, "
+        f"{counts['unsupported']} unsupported, {counts['unverified']} unverified."
+    )
+    for claim in payload["claims"]:
+        if claim["verdict"] == "supported":
+            continue
+        print(f"\n{claim['verdict'].upper()} line {claim['line']} {claim['citation']}")
+        print(f"  {claim['claim']}")
+        print(f"  {claim['message']}")
+    if payload["ok"] and not counts["weak"]:
+        print("\nEvery cited claim is supported by its record.")
+    else:
+        print(f"\n{payload['method']}")
+    return 0 if payload["ok"] else 1
 
 
 def _run_verify_artifact(arguments: argparse.Namespace) -> int:
