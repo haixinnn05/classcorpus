@@ -113,7 +113,8 @@ For PDF guides, prefer fenced `math` blocks; the renderer also detects
 equations, matrices, and vectors. Never present equations as programming code.
 Render with
 `scripts/render_study_guide.py SOURCE.md OUTPUT.pdf` and visually inspect the
-PDF. Verify final artifacts with `classcorpus verify-artifact ARTIFACT --json`.
+PDF. Verify artifacts with `verify-artifact ARTIFACT --json`, and every cited
+claim with `check-claims SOURCE --json`; correct unsupported claims.
 
 ## Boundaries
 

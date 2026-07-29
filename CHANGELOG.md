@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- Check whether cited claims are supported by the records they cite with
+  `classcorpus check-claims SOURCE`. `verify-artifact` detects a changed source;
+  this detects a claim the cited record does not make, which is the case a
+  well-formed citation on a fabricated value would otherwise pass. Complexity
+  expressions, powers, and numbers are compared strictly and without whitespace,
+  so `O(V * E)` matches `O(V*E)` while an invented `O(V log V)` is reported. The
+  check is lexical and local, so it is a support signal rather than proof of
+  entailment.
+
 ## 0.6.1 - 2026-07-28
 
 ### Fixed

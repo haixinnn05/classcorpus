@@ -59,6 +59,7 @@ approach can be agreed before code is written. See
 
 ## Completed
 
+- Checked cited claims against the records they cite with `check-claims`
 - Installed the complete Agent Skill from the published package with
   `classcorpus install-skill`
 - Published to PyPI with OpenID Connect trusted publishing

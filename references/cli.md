@@ -27,6 +27,7 @@ classcorpus inspect COURSE SOURCE ORDINAL [--field FIELD] \
   [--offset N] [--limit N] [--json]
 classcorpus manifest ARTIFACT --citations-from INPUT \
   [--overwrite] [--json]
+classcorpus check-claims SOURCE [--field FIELD] [--threshold N] [--json]
 classcorpus verify-artifact ARTIFACT [--json]
 classcorpus outline COURSE [--source PATH] [--cursor CURSOR] \
   [--budget-tokens N] [--json]
@@ -164,6 +165,36 @@ their stored hashes. JSON statuses are `current`, `artifact-modified`,
 Missing manifests are command errors. Unresolved citations create a manifest
 but make verification `unverified`; fix the citation or synchronize the course
 before treating it as current.
+
+## Check Claims
+
+`verify-artifact` asks whether a cited source still matches what was indexed.
+`check-claims` asks a different question: does the cited record actually say what
+the claim says? A well-formed citation attached to a fabricated number passes
+every hash check, so this closes that gap.
+
+Each sentence, list item, or table row carrying a citation becomes one claim, and
+a passage citing three records yields three separately checkable claims. Verdicts
+are:
+
+- `supported`: the record contains the claim's terms and measurements.
+- `weak`: little of the wording appears. Often a paraphrase, a synthesis of
+  several records, or the wrong citation. Advisory only.
+- `unsupported`: a measurement in the claim is absent from the record.
+  Measurements are complexity expressions, powers, and numbers, compared without
+  whitespace so `O(V * E)` and `O(V*E)` match.
+- `unverified`: the cited record is not indexed, so nothing can be checked.
+
+`ok` is false, and the command exits nonzero, when any claim is `unsupported` or
+`unverified`. A `weak` claim does not fail the command.
+
+`--threshold` sets the share of a claim's wording that must appear in the record
+before it counts as supported; the default is `0.6`. `--field` selects which
+stored text to compare against.
+
+The check is lexical and local. It is a support signal, not proof of entailment:
+a correct paraphrase can score low, and agreeing wording does not make a claim
+true. Treat flagged claims as requiring review against the cited record.
 
 ## Outline
 
