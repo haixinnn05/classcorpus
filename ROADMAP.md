@@ -31,6 +31,13 @@ approach can be agreed before code is written. See
 - **Deep-linked citations** that open the cited source at the exact page from
   generated HTML and PDF artifacts.
 
+## Instruction Budget
+
+- **Keep converting instructions into affordances.** Every token in `SKILL.md` is
+  charged against every workflow and is only a request the agent may ignore, while
+  a command is a guarantee. Prefer adding a command that enforces a rule over
+  prose that asks for it, and keep payload mechanics in the references.
+
 ## Engineering
 
 - **Measure subprocess coverage.** CLI tests run through `subprocess`, so

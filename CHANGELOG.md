@@ -13,6 +13,16 @@
   check is lexical and local, so it is a support signal rather than proof of
   entailment.
 
+### Changed
+
+- Restructure `SKILL.md` around routing and obligations, moving payload mechanics
+  into the references that are loaded on demand. Every token in `SKILL.md` is
+  charged against every workflow, and headroom under the context benchmark had
+  fallen to 8 tokens. The instruction set now costs 1,163 tokens rather than
+  1,288, which lowers the focused median from 1,892 to 1,767 against an unchanged
+  1,900 ceiling, restoring 133 tokens of headroom. Retrieval quality is unchanged
+  at full recall and reciprocal rank, and every documented obligation is retained.
+
 ## 0.6.1 - 2026-07-28
 
 ### Fixed
