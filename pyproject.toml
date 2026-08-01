@@ -52,7 +52,7 @@ dev = [
 ]
 embeddings = [
     "numpy>=2,<3",
-    "sentence-transformers>=3,<4",
+    "sentence-transformers>=3,<6",
 ]
 fastembed = [
     "fastembed>=0.4,<1",
