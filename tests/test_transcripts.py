@@ -46,14 +46,15 @@ def test_webvtt_parser_preserves_cues_and_timestamps(tmp_path: Path):
 
 def test_srt_parser_accepts_bom_crlf_ids_and_comma_milliseconds(tmp_path: Path):
     source = tmp_path / "seminar.srt"
-    source.write_text(
-        "\ufeff1\r\n"
-        "00:00:02,125 --> 00:00:05,900\r\n"
-        "First line\r\nSecond line\r\n\r\n"
-        "custom-id\r\n"
-        "01:02:03,500 --> 01:02:06,000\r\n"
-        "Long lecture cue\r\n",
-        encoding="utf-8",
+    source.write_bytes(
+        (
+            "\ufeff1\r\n"
+            "00:00:02,125 --> 00:00:05,900\r\n"
+            "First line\r\nSecond line\r\n\r\n"
+            "custom-id\r\n"
+            "01:02:03,500 --> 01:02:06,000\r\n"
+            "Long lecture cue\r\n"
+        ).encode("utf-8")
     )
 
     records = parse_source(source, tmp_path / "renders")
