@@ -72,13 +72,13 @@ jobs:
           CLASSCORPUS_DATA_DIR=/tmp/classcorpus-demo-data \
             /tmp/classcorpus-smoke/bin/classcorpus demo --json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-assets
           path: dist/
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: python-distributions
           path: |
