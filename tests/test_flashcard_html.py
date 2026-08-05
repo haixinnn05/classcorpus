@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pytest
 
@@ -9,6 +9,7 @@ from classcorpus.flashcard_html import (
     write_flashcards_html,
 )
 from classcorpus.flashcards import Flashcard
+from classcorpus.study_progress import identify_card_content
 
 
 @pytest.fixture
@@ -51,6 +52,9 @@ def test_rendered_deck_is_self_contained_and_preserves_cards(
             "back": card.back,
             "citation": card.citation,
             "tags": list(card.tags),
+            "id": identify_card_content(card).card_id,
+            "card_key": identify_card_content(card).card_key,
+            "source_sha256": "",
         }
         for card in cards
     ]
@@ -59,6 +63,15 @@ def test_rendered_deck_is_self_contained_and_preserves_cards(
     assert "fetch(" not in document
     assert "XMLHttpRequest" not in document
     assert "WebSocket" not in document
+    assert "localStorage" in document
+    assert "Due and new" in document
+    assert "Confidence" in document
+    assert "Again" in document
+    assert "Hard" in document
+    assert "Good" in document
+    assert "Easy" in document
+    assert "Export progress" in document
+    assert "Import progress" in document
 
 
 def test_rendered_deck_escapes_html_and_script_terminators():
@@ -84,6 +97,9 @@ def test_rendered_deck_escapes_html_and_script_terminators():
         "back": hostile.back,
         "citation": hostile.citation,
         "tags": list(hostile.tags),
+        "id": identify_card_content(hostile).card_id,
+        "card_key": identify_card_content(hostile).card_key,
+        "source_sha256": "",
     }
 
 

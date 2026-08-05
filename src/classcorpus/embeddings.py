@@ -133,7 +133,9 @@ def semantic_ranking(
         stored = _decode_blob(row["vector"], row["dimension"])
         if len(stored) != len(query_vector):
             continue
-        score = sum(left * right for left, right in zip(query_vector, stored))
+        score = sum(
+            left * right for left, right in zip(query_vector, stored, strict=True)
+        )
         scored.append((score, int(row["slide_id"])))
     scored.sort(key=lambda item: (-item[0], item[1]))
     return [slide_id for _, slide_id in scored]

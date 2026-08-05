@@ -1,9 +1,9 @@
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import sysconfig
+from pathlib import Path
 
 import pytest
 
@@ -33,6 +33,26 @@ def run_cli(
         capture_output=True,
         check=False,
     )
+
+
+def test_script_command_uses_the_installed_runtime_for_bundled_helpers(
+    tmp_path: Path,
+):
+    result = run_cli(
+        "script",
+        "read_lectures",
+        "--course",
+        "Absent",
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0, result.stderr
+    assert payload["ok"] is True
+    assert payload["records"] == []
+    assert payload["total_records"] == 0
 
 
 def test_unified_cli_indexes_searches_and_reports_course_status(tmp_path: Path):
@@ -302,8 +322,7 @@ def test_unified_cli_manifests_and_verifies_generated_artifact(tmp_path: Path):
     artifact.write_text("<h1>Bellman-Ford</h1>", encoding="utf-8")
     citation_source = tmp_path / "guide.md"
     citation_source.write_text(
-        "Bellman-Ford handles negative edges. "
-        "[Algorithms, handout.pdf, Page 2]",
+        "Bellman-Ford handles negative edges. [Algorithms, handout.pdf, Page 2]",
         encoding="utf-8",
     )
 
@@ -525,8 +544,9 @@ def test_outline_cli_covers_every_page_with_continuation(tmp_path: Path):
     assert result.returncode == 0, result.stderr
     assert payload["total_records"] == 2
     assert payload["returned_records"] >= 1
-    assert sum(item["record_count"] for item in payload["coverage"]) == (
-        payload["returned_records"]
+    assert (
+        sum(item["record_count"] for item in payload["coverage"])
+        == (payload["returned_records"])
     )
     assert payload["estimated_tokens"] > 0
     if payload["has_more"]:
@@ -563,13 +583,15 @@ def test_doctor_reports_core_and_optional_dependencies(tmp_path: Path):
     optional = [check for check in payload["checks"] if not check["required"]]
     assert result.returncode == 0, result.stderr
     assert payload["ok"] is True
-    assert {".pdf", ".pptx", ".md", ".txt"}.issubset(
-        payload["supported_formats"]
-    )
+    assert {".pdf", ".pptx", ".md", ".txt"}.issubset(payload["supported_formats"])
     assert required
     assert all(check["status"] == "pass" for check in required)
     assert optional
     assert all(check["status"] in {"pass", "optional"} for check in optional)
+    pdf_check = next(
+        check for check in optional if check["name"] == "PDF study-guide renderer"
+    )
+    assert pdf_check["status"] == "pass"
 
 
 def test_unified_cli_argument_errors_use_json_envelope(tmp_path: Path):
@@ -659,9 +681,7 @@ def test_doctor_accepts_a_console_script_whose_interpreter_exists(
     )
 
     payload = doctor_report()
-    check = {item["name"]: item for item in payload["checks"]}[
-        "Console entry point"
-    ]
+    check = {item["name"]: item for item in payload["checks"]}["Console entry point"]
 
     assert check["status"] == "pass"
     assert check["required"] is False
@@ -698,9 +718,7 @@ def test_doctor_detects_a_console_script_with_a_missing_interpreter(
     )
 
     payload = doctor_report()
-    check = {item["name"]: item for item in payload["checks"]}[
-        "Console entry point"
-    ]
+    check = {item["name"]: item for item in payload["checks"]}["Console entry point"]
 
     assert check["status"] == "fail"
     # The reported path is rendered with the platform separator.
@@ -718,9 +736,7 @@ def test_doctor_reports_an_absent_console_script_as_optional(
     )
 
     payload = doctor_report()
-    check = {item["name"]: item for item in payload["checks"]}[
-        "Console entry point"
-    ]
+    check = {item["name"]: item for item in payload["checks"]}["Console entry point"]
 
     assert check["status"] == "optional"
     assert "python -m classcorpus" in check["action"]

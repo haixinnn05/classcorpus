@@ -546,19 +546,13 @@ def test_compact_search_omits_large_content_then_exact_read_restores_it(
     assert compact_payload["estimated_tokens"] <= 1_200
     assert compact_payload["budget_tokens"] == 1_200
     assert compact_payload["omitted_content_chars"] > 100_000
-    assert compact_result["citation"] == (
-        "[Algorithms, handout.pdf, Page 1]"
-    )
+    assert compact_result["citation"] == ("[Algorithms, handout.pdf, Page 1]")
     assert "evidence" in compact_result
     assert "raw_text" not in compact_result
     assert "body_text" not in compact_result
-    assert full_payload["results"][0]["raw_text"].count("precise-content") == (
-        10_000
-    )
+    assert full_payload["results"][0]["raw_text"].count("precise-content") == (10_000)
     assert exact_payload["total_records"] == 1
-    assert exact_payload["records"][0]["raw_text"].count("precise-content") == (
-        10_000
-    )
+    assert exact_payload["records"][0]["raw_text"].count("precise-content") == (10_000)
     assert bounded.returncode == 0, bounded.stderr
     assert len(bounded.stdout) < 10_000
     assert bounded_payload["returned_chars"] == 8_000
@@ -592,9 +586,7 @@ def test_focused_retrieval_script_returns_deduplicated_bundle(tmp_path: Path):
 
     payload = json.loads(result.stdout)
     assert result.returncode == 0, result.stderr
-    assert payload["selected"]["citation"] == (
-        "[Algorithms, handout.pdf, Page 2]"
-    )
+    assert payload["selected"]["citation"] == ("[Algorithms, handout.pdf, Page 2]")
     assert "Bellman-Ford" in payload["selected"]["text"]
     assert payload["cache_key"]
     assert "snippet" not in result.stdout
@@ -763,9 +755,7 @@ def test_flashcard_conversion_script_preserves_citations_and_refuses_overwrite(
     refused_payload = json.loads(refused.stdout)
     assert converted.returncode == 0, converted.stderr
     assert payload["converted"] == 1
-    assert "[Algorithms, Lecture08.pptx, Slide 2]" in output.read_text(
-        encoding="utf-8"
-    )
+    assert "[Algorithms, Lecture08.pptx, Slide 2]" in output.read_text(encoding="utf-8")
     assert refused.returncode == 1
     assert refused_payload["error"]["type"] == "FileExistsError"
 
@@ -820,6 +810,10 @@ def test_flashcard_render_script_creates_interactive_html_and_refuses_overwrite(
     assert manifest.is_file()
     assert "<title>Algorithms Review</title>" in document
     assert "[Algorithms, Lecture08.pptx, Slide 2]" in document
+    assert '"card_key":' in document
+    assert '"source_sha256":' in document
+    assert "localStorage" in document
+    assert "classcorpus-study-progress" in document
     assert refused.returncode == 1
     assert refused_payload["error"]["type"] == "FileExistsError"
 
@@ -850,9 +844,54 @@ def test_study_guide_renderer_creates_provenance_sidecar(tmp_path: Path):
     assert rendered.stdout.strip() == str(output.resolve())
     assert output.is_file()
     assert manifest.is_file()
-    assert json.loads(manifest.read_text(encoding="utf-8"))[
-        "unresolved_citations"
-    ] == ["[Physics 1, waves.pdf, Page 4]"]
+    assert json.loads(manifest.read_text(encoding="utf-8"))["unresolved_citations"] == [
+        "[Physics 1, waves.pdf, Page 4]"
+    ]
+    original = output.read_bytes()
+    refused = run_script(
+        "render_study_guide.py",
+        str(source),
+        str(output),
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+    refused_payload = json.loads(refused.stdout)
+    assert refused.returncode == 1
+    assert refused_payload["error"]["type"] == "FileExistsError"
+    assert output.read_bytes() == original
+
+
+def test_study_guide_renderer_reports_validated_delivery_json(tmp_path: Path):
+    source = tmp_path / "guide.md"
+    output = tmp_path / "guide.pdf"
+    source.write_text(
+        "# Biology Review\n\n"
+        "## Comparison\n\n"
+        "| Structure | Function |\n"
+        "| --- | --- |\n"
+        "| Membrane | Regulates transport |\n\n"
+        "A membrane regulates transport. [Biology, cells.md, Page 1]\n",
+        encoding="utf-8",
+    )
+
+    rendered = run_script(
+        "render_study_guide.py",
+        str(source),
+        str(output),
+        "--json",
+        data_dir=tmp_path / "state",
+        cwd=tmp_path,
+    )
+
+    payload = json.loads(rendered.stdout)
+    assert rendered.returncode == 0, rendered.stderr
+    assert payload["ok"] is True
+    assert payload["delivery"]["format"] == "pdf"
+    assert payload["delivery"]["pages"] >= 2
+    assert payload["delivery"]["rendered_pages"] == payload["delivery"]["pages"]
+    assert payload["delivery"]["text_chars"] > 0
+    assert payload["manifest"].endswith("guide.pdf.classcorpus.json")
 
 
 def test_study_guide_uses_the_document_title_and_cited_course(tmp_path: Path):
@@ -886,8 +925,7 @@ def test_study_guide_flags_override_the_derived_title(tmp_path: Path):
     source = tmp_path / "guide.md"
     output = tmp_path / "guide.pdf"
     source.write_text(
-        "# Ignored Heading\n\n"
-        "## Topic\n\nA claim. [Algorithms, handout.pdf, Page 1]\n",
+        "# Ignored Heading\n\n## Topic\n\nA claim. [Algorithms, handout.pdf, Page 1]\n",
         encoding="utf-8",
     )
 

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections import Counter
 import hashlib
 import os
 import re
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 import fitz
@@ -12,7 +12,7 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from classcorpus.models import ExtractionStatus, SlideRecord, VisualAsset
-from classcorpus.parser_plugins import DOCX_PLUGIN, TEXT_PLUGIN
+from classcorpus.parser_plugins import DOCX_PLUGIN, TEXT_PLUGIN, TRANSCRIPT_PLUGIN
 from classcorpus.parser_registry import ParserPlugin, ParserRegistry
 
 
@@ -177,9 +177,7 @@ def _pdf_audit(page: fitz.Page, raw_text: str) -> tuple[bool, tuple[str, ...]]:
 
 def _xml_texts(element) -> list[str]:
     return [
-        node.text
-        for node in element.iter()
-        if node.tag.endswith("}t") and node.text
+        node.text for node in element.iter() if node.tag.endswith("}t") and node.text
     ]
 
 
@@ -232,8 +230,7 @@ def _pptx_audit(slide, missing_texts: list[str]) -> tuple[bool, tuple[str, ...]]
             }
         )
         or "chart" in local_tags
-        or "http://schemas.openxmlformats.org/drawingml/2006/diagram"
-        in namespaces
+        or "http://schemas.openxmlformats.org/drawingml/2006/diagram" in namespaces
         or bool(
             relationship_suffixes
             & {
@@ -358,6 +355,7 @@ _PARSER_REGISTRY.register(
 )
 _PARSER_REGISTRY.register(DOCX_PLUGIN)
 _PARSER_REGISTRY.register(TEXT_PLUGIN)
+_PARSER_REGISTRY.register(TRANSCRIPT_PLUGIN)
 
 
 def register_parser(plugin: ParserPlugin) -> None:

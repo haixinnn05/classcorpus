@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from _common import argument_parser, emit, fail
+
 from classcorpus.database import Database
 from classcorpus.records import read_records
 from classcorpus.security import mark_untrusted_content

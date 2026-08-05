@@ -2,36 +2,45 @@ from __future__ import annotations
 
 import argparse
 import atexit
-from html import escape
 import hashlib
-from pathlib import Path
+import json
+import os
 import re
 import shutil
+import sys
 import tempfile
+from html import escape
+from pathlib import Path
 
-from matplotlib.font_manager import FontProperties
-from matplotlib.mathtext import math_to_image
-from PIL import Image as PillowImage
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (
-    HRFlowable,
-    Image,
-    ListFlowable,
-    ListItem,
-    PageBreak,
-    Paragraph,
-    Preformatted,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
+try:
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.mathtext import math_to_image
+    from PIL import Image as PillowImage
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import (
+        HRFlowable,
+        Image,
+        ListFlowable,
+        ListItem,
+        PageBreak,
+        Paragraph,
+        Preformatted,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+except ModuleNotFoundError as error:
+    raise SystemExit(
+        f"PDF rendering dependency is missing: {error.name}. "
+        'Install it with: pip install -e ".[pdf]"'
+    ) from error
 
 from classcorpus.database import Database
 from classcorpus.math_notation import (
@@ -41,7 +50,12 @@ from classcorpus.math_notation import (
     normalize_math_expression,
     strip_display_math_delimiters,
 )
-from classcorpus.provenance import CITATION_PATTERN, write_artifact_manifest
+from classcorpus.provenance import (
+    CITATION_PATTERN,
+    inspect_artifact,
+    manifest_path,
+    write_artifact_manifest,
+)
 
 PAGE_LABEL = "STUDY GUIDE"
 FOOTER_LABEL = "COURSE MATERIALS"
@@ -276,12 +290,7 @@ def cover(
         )
     )
     stats = Table(
-        [
-            [
-                Paragraph(inline_markup(value), st["cover_meta"])
-                for value in stats_values
-            ]
-        ],
+        [[Paragraph(inline_markup(value), st["cover_meta"]) for value in stats_values]],
         colWidths=[6.9 * inch / len(stats_values)] * len(stats_values),
     )
     stats.setStyle(
@@ -401,11 +410,14 @@ def math_block(lines: list[str], st: dict[str, ParagraphStyle]):
     return table
 
 
-def flush_paragraph(lines: list[str], story: list, st: dict[str, ParagraphStyle]) -> None:
+def flush_paragraph(
+    lines: list[str], story: list, st: dict[str, ParagraphStyle]
+) -> None:
     if not lines:
         return
     text = " ".join(line.strip() for line in lines)
-    style = st["citation"] if text.startswith("[Physics,") else st["body"]
+    without_citations = CITATION_PATTERN.sub("", text).strip()
+    style = st["citation"] if not without_citations else st["body"]
     story.append(Paragraph(inline_markup(text), style))
     lines.clear()
 
@@ -467,7 +479,17 @@ def markdown_story(text: str, st: dict[str, ParagraphStyle]) -> list:
                 [Paragraph(inline_markup(cell), st["small"]) for cell in row]
                 for row in rows
             ]
-            table = Table(data, colWidths=[1.55 * inch, 1.55 * inch, 3.7 * inch])
+            column_count = max((len(row) for row in data), default=0)
+            if not column_count:
+                table_lines = []
+                return
+            for row in data:
+                row.extend([Paragraph("", st["small"])] * (column_count - len(row)))
+            if column_count == 3:
+                column_widths = [1.55 * inch, 1.55 * inch, 3.7 * inch]
+            else:
+                column_widths = [6.8 * inch / column_count] * column_count
+            table = Table(data, colWidths=column_widths, repeatRows=1)
             table.setStyle(
                 TableStyle(
                     [
@@ -551,9 +573,7 @@ def markdown_story(text: str, st: dict[str, ParagraphStyle]) -> list:
             continue
         if looks_like_display_math(line):
             flush_all()
-            story.append(
-                math_block([strip_display_math_delimiters(line)], st)
-            )
+            story.append(math_block([strip_display_math_delimiters(line)], st))
             story.append(Spacer(1, 8))
             continue
         unordered = re.match(r"^- (.+)$", line)
@@ -619,7 +639,7 @@ def cited_course(source_text: str) -> str | None:
     return None
 
 
-def main() -> None:
+def main() -> int:
     global FOOTER_LABEL, PAGE_LABEL
     parser = argparse.ArgumentParser(
         description="Render a cited Markdown study guide as a polished PDF."
@@ -641,52 +661,129 @@ def main() -> None:
         default=[],
         help="Cover statistic; repeat up to three times.",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace an existing PDF and provenance sidecar.",
+    )
+    parser.add_argument("--json", action="store_true", dest="json_mode")
     arguments = parser.parse_args()
-    stats_values = arguments.stat or ["Cited concepts", "Formula review", "Practice set"]
-    if len(stats_values) > 3:
-        parser.error("--stat may be repeated at most three times")
+    try:
+        stats_values = arguments.stat or [
+            "Cited concepts",
+            "Formula review",
+            "Practice set",
+        ]
+        if len(stats_values) > 3:
+            raise ValueError("--stat may be repeated at most three times")
 
-    source_text = arguments.source.read_text(encoding="utf-8")
-    # The body omits the level-one heading, so use it as the cover title, and
-    # take the course from the citations already written into the guide.
-    title = arguments.title or document_title(source_text) or "Study Guide"
-    course_label = arguments.course_label or cited_course(source_text) or "COURSE"
+        source = arguments.source.expanduser().resolve()
+        output = arguments.output.expanduser().resolve()
+        if not source.is_file():
+            raise FileNotFoundError(f"study-guide source not found: {source}")
+        if output.suffix.lower() != ".pdf":
+            raise ValueError("study-guide output must use the .pdf extension")
+        sidecar = manifest_path(output)
+        existing = [path for path in (output, sidecar) if path.exists()]
+        if existing and not arguments.overwrite:
+            names = ", ".join(str(path) for path in existing)
+            raise FileExistsError(
+                f"output already exists: {names}; pass --overwrite to replace it"
+            )
 
-    PAGE_LABEL = f"{course_label} STUDY GUIDE".upper()
-    FOOTER_LABEL = course_label.upper()
-    arguments.output.parent.mkdir(parents=True, exist_ok=True)
+        source_text = source.read_text(encoding="utf-8")
+        # The body omits the level-one heading, so use it as the cover title, and
+        # take the course from the citations already written into the guide.
+        title = arguments.title or document_title(source_text) or "Study Guide"
+        course_label = arguments.course_label or cited_course(source_text) or "COURSE"
 
-    st = styles()
-    document = SimpleDocTemplate(
-        str(arguments.output),
-        pagesize=letter,
-        rightMargin=0.65 * inch,
-        leftMargin=0.65 * inch,
-        topMargin=0.55 * inch,
-        bottomMargin=0.62 * inch,
-        title=title if title.startswith(course_label) else f"{course_label} {title}",
-        author="ClassCorpus",
-        subject="Evidence-grounded course study guide",
-    )
-    story = cover(
-        st,
-        title=title,
-        subtitle=arguments.subtitle,
-        course_label=course_label,
-        stats_values=stats_values,
-    )
-    story.extend(markdown_story(source_text, st))
-    document.build(story, onFirstPage=page_decor, onLaterPages=page_decor)
-    database = Database()
-    database.initialize()
-    write_artifact_manifest(
-        database,
-        artifact=arguments.output,
-        citation_source=arguments.source,
-        overwrite=True,
-    )
-    print(arguments.output.resolve())
+        PAGE_LABEL = f"{course_label} STUDY GUIDE".upper()
+        FOOTER_LABEL = course_label.upper()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=output.parent,
+                prefix=f".{output.stem}.",
+                suffix=".pdf",
+                delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
+
+            st = styles()
+            document = SimpleDocTemplate(
+                str(temporary),
+                pagesize=letter,
+                rightMargin=0.65 * inch,
+                leftMargin=0.65 * inch,
+                topMargin=0.55 * inch,
+                bottomMargin=0.62 * inch,
+                title=(
+                    title
+                    if title.startswith(course_label)
+                    else f"{course_label} {title}"
+                ),
+                author="ClassCorpus",
+                subject="Evidence-grounded course study guide",
+            )
+            story = cover(
+                st,
+                title=title,
+                subtitle=arguments.subtitle,
+                course_label=course_label,
+                stats_values=stats_values,
+            )
+            story.extend(markdown_story(source_text, st))
+            document.build(story, onFirstPage=page_decor, onLaterPages=page_decor)
+            delivery = inspect_artifact(temporary)
+            if not delivery["ok"]:
+                raise ValueError(str(delivery["error"]))
+            os.replace(temporary, output)
+            temporary = None
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+
+        database = Database()
+        database.initialize()
+        provenance = write_artifact_manifest(
+            database,
+            artifact=output,
+            citation_source=source,
+            overwrite=arguments.overwrite,
+        )
+        result = {
+            "ok": True,
+            "source": str(source),
+            "output": str(output),
+            "manifest": provenance["manifest"],
+            "title": title,
+            "course_label": course_label,
+            "delivery": delivery,
+        }
+        if arguments.json_mode:
+            print(json.dumps(result, ensure_ascii=False))
+        else:
+            print(output)
+        return 0
+    except Exception as error:
+        if arguments.json_mode:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": {
+                            "type": type(error).__name__,
+                            "message": str(error),
+                        },
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(f"Error: {error}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

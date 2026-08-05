@@ -14,6 +14,7 @@ def parse_text_document(path: Path, render_dir: Path) -> list[SlideRecord]:
         (index for index, line in enumerate(lines) if line.strip()),
         None,
     )
+    reasons: tuple[str, ...]
     if title_index is None:
         title = ""
         body_text = ""
@@ -26,9 +27,7 @@ def parse_text_document(path: Path, render_dir: Path) -> list[SlideRecord]:
             else title_line
         )
         body_text = "\n".join(
-            line.rstrip()
-            for index, line in enumerate(lines)
-            if index != title_index
+            line.rstrip() for index, line in enumerate(lines) if index != title_index
         ).strip()
         reasons = ()
     return [
@@ -54,4 +53,3 @@ TEXT_PLUGIN = ParserPlugin(
 )
 
 __all__ = ["TEXT_PLUGIN", "parse_text_document"]
-

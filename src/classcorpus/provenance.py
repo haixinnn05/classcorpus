@@ -1,22 +1,26 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import hashlib
-from importlib.metadata import PackageNotFoundError, version
 import json
 import os
-from pathlib import Path
-import re
 import tempfile
+from datetime import datetime, timezone
+from html.parser import HTMLParser
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any
 
+import fitz
+
+from classcorpus.citations import (
+    CITATION_PATTERN,
+    format_record_citation,
+    logical_record_kind,
+)
 from classcorpus.database import Database
 
 MANIFEST_SUFFIX = ".classcorpus.json"
 MANIFEST_VERSION = 1
-CITATION_PATTERN = re.compile(
-    r"\[[^\]\n]+,\s*(?:Slide|Page)\s+\d+\]"
-)
 
 
 def manifest_path(artifact: Path) -> Path:
@@ -81,10 +85,20 @@ def verify_artifact(
     issues: list[dict[str, str]] = []
     if not artifact.is_file():
         issues.append({"type": "artifact_missing", "message": "Artifact is missing."})
-    elif _sha256(artifact) != payload.get("artifact_sha256"):
-        issues.append(
-            {"type": "artifact_modified", "message": "Artifact hash changed."}
-        )
+        delivery = None
+    else:
+        if _sha256(artifact) != payload.get("artifact_sha256"):
+            issues.append(
+                {"type": "artifact_modified", "message": "Artifact hash changed."}
+            )
+        delivery = inspect_artifact(artifact)
+        if not delivery["ok"]:
+            issues.append(
+                {
+                    "type": "artifact_unreadable",
+                    "message": str(delivery["error"]),
+                }
+            )
 
     for source in payload.get("sources", []):
         row = database.connection.execute(
@@ -137,6 +151,8 @@ def verify_artifact(
         status = "artifact-missing"
     elif "artifact_modified" in issue_types:
         status = "artifact-modified"
+    elif "artifact_unreadable" in issue_types:
+        status = "artifact-unreadable"
     elif "citation_unresolved" in issue_types:
         status = "unverified"
     else:
@@ -147,8 +163,95 @@ def verify_artifact(
         "artifact": str(artifact),
         "manifest": str(target),
         "issues": issues,
+        "delivery": delivery,
         "citations": payload.get("citations", []),
         "sources": payload.get("sources", []),
+    }
+
+
+def inspect_artifact(artifact: Path) -> dict[str, Any]:
+    """Confirm that a delivered artifact can be decoded and rendered locally."""
+    artifact = artifact.expanduser().resolve()
+    if not artifact.is_file():
+        return {
+            "ok": False,
+            "format": artifact.suffix.lower().lstrip(".") or "unknown",
+            "error": f"Artifact is missing: {artifact}",
+        }
+    suffix = artifact.suffix.lower()
+    try:
+        if suffix == ".pdf":
+            return _inspect_pdf(artifact)
+        if suffix in {".html", ".htm"}:
+            return _inspect_html(artifact)
+        return {
+            "ok": True,
+            "format": suffix.lstrip(".") or "unknown",
+            "bytes": artifact.stat().st_size,
+        }
+    except (OSError, UnicodeError, ValueError, fitz.FileDataError) as error:
+        return {
+            "ok": False,
+            "format": suffix.lstrip(".") or "unknown",
+            "error": f"Artifact cannot be opened or rendered: {error}",
+        }
+
+
+def _inspect_pdf(artifact: Path) -> dict[str, Any]:
+    document = fitz.open(artifact)
+    try:
+        if document.needs_pass:
+            raise ValueError("PDF is encrypted")
+        if document.page_count < 1:
+            raise ValueError("PDF has no pages")
+        text_chars = 0
+        for page in document:
+            text_chars += len(page.get_text())
+            pixmap = page.get_pixmap(matrix=fitz.Matrix(0.25, 0.25), alpha=False)
+            if pixmap.width < 1 or pixmap.height < 1:
+                raise ValueError(f"PDF page {page.number + 1} did not render")
+        return {
+            "ok": True,
+            "format": "pdf",
+            "bytes": artifact.stat().st_size,
+            "pages": document.page_count,
+            "rendered_pages": document.page_count,
+            "text_chars": text_chars,
+        }
+    finally:
+        document.close()
+
+
+class _ArtifactHTMLParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.elements = 0
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        del tag, attrs
+        self.elements += 1
+
+
+def _inspect_html(artifact: Path) -> dict[str, Any]:
+    content = artifact.read_text(encoding="utf-8")
+    if not content.strip():
+        raise ValueError("HTML is empty")
+    if "\x00" in content:
+        raise ValueError("HTML contains NUL bytes")
+    parser = _ArtifactHTMLParser()
+    parser.feed(content)
+    parser.close()
+    if parser.elements < 1:
+        raise ValueError("HTML contains no elements")
+    return {
+        "ok": True,
+        "format": "html",
+        "bytes": artifact.stat().st_size,
+        "elements": parser.elements,
     }
 
 
@@ -167,17 +270,21 @@ def _resolve_citations(
         """
         SELECT courses.name AS course, source_files.relative_path AS source_file,
                source_files.sha256, source_files.parser_version,
-               slides.ordinal, slides.kind
+               slides.ordinal, slides.kind, slides.start_ms, slides.end_ms
         FROM slides
         JOIN source_files ON source_files.id = slides.source_file_id
         JOIN courses ON courses.id = source_files.course_id
         """
     ).fetchall()
     for row in rows:
-        label = "Slide" if row["kind"] == "slide" else "Page"
-        citation = (
-            f"[{row['course']}, {row['source_file']}, "
-            f"{label} {row['ordinal']}]"
+        start_ms = int(row["start_ms"]) if row["start_ms"] is not None else None
+        kind = logical_record_kind(str(row["kind"]), start_ms)
+        citation = format_record_citation(
+            course=str(row["course"]),
+            source_file=str(row["source_file"]),
+            kind=kind,
+            ordinal=int(row["ordinal"]),
+            start_ms=start_ms,
         )
         if citation not in wanted:
             continue
@@ -187,7 +294,9 @@ def _resolve_citations(
                 "course": str(row["course"]),
                 "source_file": str(row["source_file"]),
                 "ordinal": int(row["ordinal"]),
-                "kind": str(row["kind"]),
+                "kind": kind,
+                "start_ms": start_ms,
+                "end_ms": (int(row["end_ms"]) if row["end_ms"] is not None else None),
                 "indexed_sha256": str(row["sha256"]),
                 "parser_version": str(row["parser_version"]),
             }
@@ -237,6 +346,7 @@ def _package_version() -> str:
 __all__ = [
     "CITATION_PATTERN",
     "MANIFEST_SUFFIX",
+    "inspect_artifact",
     "manifest_path",
     "verify_artifact",
     "write_artifact_manifest",

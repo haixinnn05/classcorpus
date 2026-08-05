@@ -2,8 +2,8 @@
 
 ClassCorpus keeps cited JSON as the portable source, renders a self-contained
 interactive HTML deck by default, and converts to CSV or TSV when requested.
-It does not create a flashcard database or depend on a specific study
-application.
+It does not depend on a specific study application. Optional review history is
+stored in the local ClassCorpus database without card text.
 
 ## Normalized Card
 
@@ -42,10 +42,23 @@ python scripts/render_flashcards.py INPUT.json OUTPUT.html \
   [--title TITLE] [--overwrite] --json
 ```
 
-The deck provides reveal, previous/next, shuffle, exact-tag filtering, and
-session-only known/review tracking. Card content is inserted as text, and
-embedded JSON is escaped to prevent HTML or script injection. Rendering is
-atomic and refuses an existing destination unless `--overwrite` is explicit.
+The deck asks for confidence before reveal, accepts Again/Hard/Good/Easy
+ratings, schedules cards with a deterministic local SM-2-inspired policy, and
+provides due/new and exact-tag filters alongside previous/next and shuffle.
+Review state is kept in browser-local storage. Export/import uses the same
+privacy-preserving progress JSON as the CLI, so it is also a portable backup
+when a browser restricts storage for local files.
+
+Each embedded card has a content-stable `card_key`, a source-version-specific
+`id`, and `source_sha256`. The renderer resolves source versions from the local
+index when available. Card content is inserted as text, and embedded JSON is
+escaped to prevent HTML or script injection. Rendering is atomic and refuses
+an existing destination unless `--overwrite` is explicit.
+
+Use `classcorpus review DECK.json` for a database-backed due queue. Review state
+uses the same identities, so changed lecture evidence is reported as stale.
+Progress JSON can move between the HTML deck and CLI without including card
+fronts or backs.
 
 ## Conversion
 

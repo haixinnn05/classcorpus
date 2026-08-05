@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Literal
 
+from classcorpus.citations import format_record_citation, logical_record_kind
 from classcorpus.database import Database
 from classcorpus.models import ExtractionStatus, VisualAsset
 
@@ -18,7 +19,7 @@ class LectureRecord:
     source_status: str
     source_error: str | None
     ordinal: int
-    kind: Literal["slide", "page"]
+    kind: Literal["slide", "page", "transcript"]
     title: str
     body_text: str
     speaker_notes: str
@@ -36,6 +37,8 @@ class LectureRecord:
     ocr_status: str
     visual_assets: tuple[VisualAsset, ...]
     citation: str
+    start_ms: int | None = None
+    end_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +115,8 @@ def read_records(
             source_files.error_message AS source_error,
             slides.ordinal,
             slides.kind,
+            slides.start_ms,
+            slides.end_ms,
             slides.title,
             slides.body_text,
             slides.speaker_notes,
@@ -146,9 +151,7 @@ def read_records(
         next_cursor = _encode_cursor(last.source_file, last.ordinal)
 
     review_needed = int(summary["review_needed"])
-    warnings: list[dict[str, object]] = list(
-        database.source_failures(course)
-    )
+    warnings: list[dict[str, object]] = list(database.source_failures(course))
     if review_needed:
         warnings.append(
             {
@@ -190,17 +193,16 @@ def _scope(
 
 def _record_from_row(database: Database, row) -> LectureRecord:
     values = dict(row)
-    values["extraction_reasons"] = tuple(
-        json.loads(values["extraction_reasons"])
-    )
+    values["extraction_reasons"] = tuple(json.loads(values["extraction_reasons"]))
     values["has_visual_content"] = bool(values["has_visual_content"])
-    values["visual_assets"] = database.visual_assets_for_slide(
-        int(values["slide_id"])
-    )
-    label = "Slide" if values["kind"] == "slide" else "Page"
-    values["citation"] = (
-        f"[{values['course']}, {values['source_file']}, "
-        f"{label} {values['ordinal']}]"
+    values["kind"] = logical_record_kind(values["kind"], values["start_ms"])
+    values["visual_assets"] = database.visual_assets_for_slide(int(values["slide_id"]))
+    values["citation"] = format_record_citation(
+        course=values["course"],
+        source_file=values["source_file"],
+        kind=values["kind"],
+        ordinal=values["ordinal"],
+        start_ms=values["start_ms"],
     )
     return LectureRecord(**values)
 

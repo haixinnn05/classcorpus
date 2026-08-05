@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from _common import argument_parser, emit, fail
 from _embeddings import create_encoder
+
 from classcorpus.database import Database
 from classcorpus.embeddings import build_embeddings
 

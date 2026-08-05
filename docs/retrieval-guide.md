@@ -97,7 +97,11 @@ Expected citations look like:
 ```text
 [Algorithms, Lecture08.pptx, Slide 27]
 [Algorithms, handout.pdf, Page 3]
+[Algorithms, Lecture08.vtt, 14:32]
 ```
+
+Transcript citations point to the exact cue start time; read and inspect them
+with the record's one-based ordinal returned in search results.
 
 Verify an exact citation against the current source file:
 
@@ -118,6 +122,7 @@ Verify a generated study artifact and the indexed sources behind its citations:
 ```bash
 classcorpus manifest guide.pdf --citations-from guide.md --json
 classcorpus verify-artifact guide.pdf --json
+classcorpus verify-study guide.md --artifact guide.pdf --json
 ```
 
 The PDF study-guide and HTML flashcard renderers create this
@@ -125,6 +130,13 @@ The PDF study-guide and HTML flashcard renderers create this
 citations, parser versions, and relative source names, but no absolute course
 paths. Verification reports source drift, missing sources, modified artifacts,
 and unresolved citations.
+
+`verify-study` is the combined delivery gate. It also checks whether cited
+claims are lexically supported, reports uncited prose and extraction-risk
+records, and shows how many indexed source files each cited course represents.
+Pass `--require-all-sources` for a whole-course artifact. Weak paraphrases and
+uncited prose remain warnings; unsupported measurements, unresolved citations,
+stale sources, and broken artifact manifests fail the command.
 
 ## Untrusted Content
 

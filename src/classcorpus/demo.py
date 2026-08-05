@@ -17,8 +17,8 @@ from pptx.util import Inches
 
 from classcorpus.database import Database
 from classcorpus.indexer import sync_course
-from classcorpus.payloads import search_response
 from classcorpus.paths import data_root
+from classcorpus.payloads import search_response
 from classcorpus.search import search
 
 DEMO_COURSE_NAME = "ClassCorpus Demo"
@@ -32,7 +32,9 @@ def demo_source_root() -> Path:
     return data_root() / "demo-course"
 
 
-def generate_demo_corpus(directory: Path, *, overwrite: bool = False) -> tuple[str, ...]:
+def generate_demo_corpus(
+    directory: Path, *, overwrite: bool = False
+) -> tuple[str, ...]:
     """Write the demo lecture files and return their names in stable order.
 
     Refuses to write into an existing non-empty directory that ClassCorpus did

@@ -218,6 +218,8 @@ def test_initialize_migrates_legacy_slides_for_review(tmp_path):
     assert row["extraction_status"] == "review-needed"
     assert json.loads(row["extraction_reasons"]) == ["legacy-record-not-audited"]
     assert row["native_text_chars"] == len(row["raw_text"])
+    assert row["start_ms"] is None
+    assert row["end_ms"] is None
 
 
 def test_initialize_preserves_evidence_during_partial_migration(tmp_path):
@@ -501,9 +503,7 @@ def test_schema_enforces_required_uniqueness_and_cascade(tmp_path):
             )
 
     assert db.remove_course("Algorithms") is True
-    assert (
-        db.connection.execute("SELECT COUNT(*) FROM source_files").fetchone()[0] == 0
-    )
+    assert db.connection.execute("SELECT COUNT(*) FROM source_files").fetchone()[0] == 0
     assert db.connection.execute("SELECT COUNT(*) FROM slides").fetchone()[0] == 0
 
 

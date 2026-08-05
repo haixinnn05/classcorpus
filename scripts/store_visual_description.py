@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from _common import argument_parser, emit, fail
+
 from classcorpus.database import Database
 from classcorpus.vision import store_descriptions
 

@@ -7,12 +7,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from benchmarks.accuracy import run_accuracy_benchmark
+from benchmarks.efficiency import run_token_efficiency_benchmark
+from benchmarks.generate import generate_corpus
 from classcorpus.database import Database
 from classcorpus.indexer import sync_course
 from classcorpus.search import search
-
-from benchmarks.efficiency import run_token_efficiency_benchmark
-from benchmarks.generate import generate_corpus
 
 MANIFEST_PATH = Path(__file__).with_name("manifest.json")
 RETRIEVAL_LIMIT = 5
@@ -44,6 +44,10 @@ def _run_benchmark(work_dir: Path) -> dict[str, Any]:
         report = sync_course(database, str(manifest["course"]), corpus_dir)
         extraction = _evaluate_extraction(database, manifest)
         retrieval = _evaluate_retrieval(database, manifest)
+        accuracy = run_accuracy_benchmark(
+            database,
+            corpus_dir=work_dir / "accuracy-corpus",
+        )
         token_efficiency = run_token_efficiency_benchmark(
             database,
             corpus_dir=work_dir / "efficiency-corpus",
@@ -60,6 +64,7 @@ def _run_benchmark(work_dir: Path) -> dict[str, Any]:
         report.failed == 0
         and extraction["passed"]
         and retrieval["passed"]
+        and accuracy["passed"]
         and token_efficiency["passed"]
     )
     return {
@@ -79,6 +84,7 @@ def _run_benchmark(work_dir: Path) -> dict[str, Any]:
         },
         "extraction": extraction,
         "retrieval": retrieval,
+        "accuracy": accuracy,
         "token_efficiency": token_efficiency,
     }
 
@@ -119,9 +125,7 @@ def _evaluate_extraction(
         JOIN source_files ON source_files.id = slides.source_file_id
         """
     ).fetchall()
-    records = {
-        (str(row["relative_path"]), int(row["ordinal"])): row for row in rows
-    }
+    records = {(str(row["relative_path"]), int(row["ordinal"])): row for row in rows}
     for case in manifest["extraction_cases"]:
         key = (str(case["source"]), int(case["ordinal"]))
         row = records.get(key)
@@ -229,12 +233,20 @@ def main() -> int:
     else:
         extraction = result["extraction"]
         retrieval = result["retrieval"]
-        print(
-            f"Extraction: {extraction['successful_cases']}/{extraction['cases']}"
-        )
+        print(f"Extraction: {extraction['successful_cases']}/{extraction['cases']}")
         print(
             f"Retrieval recall@5: {retrieval['recall_at_5']:.3f}; "
             f"MRR: {retrieval['mean_reciprocal_rank']:.3f}"
+        )
+        accuracy = result["accuracy"]
+        print(
+            "Multi-domain accuracy: "
+            f"retrieval {accuracy['retrieval']['top_1_accuracy']:.3f}; "
+            f"citations {accuracy['retrieval']['citation_accuracy']:.3f}; "
+            f"synthesis {accuracy['synthesis']['coverage_accuracy']:.3f}; "
+            f"unanswerable {accuracy['unanswerable']['refusal_accuracy']:.3f}; "
+            f"claims {accuracy['claims']['verdict_accuracy']:.3f}; "
+            f"visual review {accuracy['visual_review']['accuracy']:.3f}"
         )
         efficiency = result["token_efficiency"]
         focused = efficiency["workflows"]["focused"]
@@ -245,10 +257,7 @@ def main() -> int:
             f"median {focused['median_context_tokens']:.0f}; "
             f"p95 {focused['p95_context_tokens']:.0f} estimated tokens"
         )
-        print(
-            "Focused reduction: "
-            f"{reductions['focused_vs_adaptive']:.1%} vs adaptive"
-        )
+        print(f"Focused reduction: {reductions['focused_vs_adaptive']:.1%} vs adaptive")
         print(
             "Adaptive context: "
             f"median {adaptive['median_context_tokens']:.0f}; "

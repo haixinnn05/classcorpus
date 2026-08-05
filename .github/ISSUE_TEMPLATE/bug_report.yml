@@ -23,6 +23,9 @@ body:
       options:
         - PDF
         - PPTX
+        - DOCX
+        - Markdown or text
+        - WebVTT or SRT
         - Not source-specific
     validations:
       required: true

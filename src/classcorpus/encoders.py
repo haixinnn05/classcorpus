@@ -88,9 +88,7 @@ def create_encoder(
     dimensions: int = 384,
 ):
     if backend == "sentence-transformers":
-        return SentenceTransformerEncoder(
-            model_name or DEFAULT_SENTENCE_TRANSFORMER
-        )
+        return SentenceTransformerEncoder(model_name or DEFAULT_SENTENCE_TRANSFORMER)
     if backend == "fastembed":
         return FastEmbedEncoder(model_name or DEFAULT_FASTEMBED_MODEL)
     if backend == "hashing":
@@ -109,4 +107,3 @@ __all__ = [
     "SentenceTransformerEncoder",
     "create_encoder",
 ]
-

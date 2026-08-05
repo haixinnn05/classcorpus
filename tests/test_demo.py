@@ -1,8 +1,8 @@
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -73,9 +73,7 @@ def test_demo_indexes_every_generated_format(tmp_path: Path):
     )
 
     payload = json.loads(outline.stdout)
-    indexed_files = {
-        source["source_file"] for source in payload["sources"].values()
-    }
+    indexed_files = {source["source_file"] for source in payload["sources"].values()}
     assert indexed_files == {
         "Lecture01-Complexity.pptx",
         "handout-shortest-paths.pdf",

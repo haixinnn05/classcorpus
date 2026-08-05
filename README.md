@@ -5,11 +5,11 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/haixinnn05/classcorpus/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-**Ask your AI assistant about your lectures and get answers with exact slide and
-page citations.**
+**Ask your AI assistant about your lectures and get answers with exact slide,
+page, and transcript timestamp citations.**
 
-ClassCorpus indexes a semester of local PDF, PowerPoint, Word, Markdown, and
-text materials once. After that, Claude Code, Codex, and other Agent
+ClassCorpus indexes a semester of local PDF, PowerPoint, Word, Markdown, text,
+WebVTT, and SRT materials once. After that, Claude Code, Codex, and other Agent
 Skills-compatible assistants can answer course questions, build study guides,
 and generate flashcards that cite the exact source — without reloading every
 file into context.
@@ -87,10 +87,11 @@ directory, so the agent can discover it. Restart or reload the agent afterwards.
 
 `uv tool install classcorpus` and `pip install classcorpus` also work.
 
-`install-skill` detects Claude Code and Codex from `~/.claude` and `~/.codex`,
-and installs for every agent it finds. Narrow it with `--agent claude` or
-`--agent codex`, or choose any other location with `--target DIRECTORY`. It
-refuses to replace a directory it did not install unless you pass `--overwrite`.
+`install-skill` detects Claude Code, Codex, Gemini CLI, and GitHub Copilot CLI
+from their standard personal skill homes and installs for every agent it finds.
+Narrow it with `--agent claude|codex|gemini|copilot`, or choose any other
+location with `--target DIRECTORY`. It refuses to replace a directory it did not
+install unless you pass `--overwrite`.
 
 ### From A Clone
 
@@ -161,6 +162,21 @@ git pull
 Reload the agent afterwards. Indexed courses survive updates; run
 `classcorpus sync COURSE` if a parser change requires re-extraction.
 
+### Claude Code Plugin Marketplace
+
+Install the local runtime, then add and install the repository's marketplace:
+
+```text
+pipx install classcorpus
+/plugin marketplace add haixinnn05/classcorpus
+/plugin install classcorpus@classcorpus
+```
+
+The plugin provides the skill instructions and bundled workflows; the pipx
+package provides the local parser, SQLite index, and `classcorpus` command. The
+skill runs packaged helpers through `classcorpus script`, so they use pipx's
+isolated Python environment. No lecture data is bundled or uploaded.
+
 ## Five-Minute Start
 
 **Keep course files where they already are.** You do not upload or copy slides
@@ -206,6 +222,11 @@ verification, and artifact provenance, see
 | PPTX | One per slide | Text, tables, speaker notes, exact embedded image bytes and placement |
 | DOCX | One logical Page 1 record | Paragraphs, hyperlinks, tables; Word pagination depends on the renderer |
 | Markdown, text | One cited page per file | UTF-8 |
+| WebVTT, SRT | One record per timed cue | Clean cue text plus exact start/end timestamps |
+
+Transcript citations use the cue start time, such as
+`[Physics, lecture.vtt, 14:32.500]`. Search, exact reads, outlines, claim checks,
+study verification, flashcards, and artifact manifests preserve these timestamps.
 
 ClassCorpus also provides:
 
@@ -288,10 +309,26 @@ python scripts/render_flashcards.py \
 ```
 
 The HTML is self-contained, responsive, keyboard accessible, and offline. It
-supports reveal, navigation, shuffle, topic filters, and session-only
-known/review tracking while preserving citations. It writes atomically and
-refuses to replace an existing file or provenance sidecar unless `--overwrite` is
-explicit.
+asks for confidence before reveal, schedules Again/Hard/Good/Easy ratings,
+filters to due and new cards, and keeps progress in browser-local storage while
+preserving citations. Progress export/import is compatible with the CLI JSON
+backup format and is the portable fallback when a browser restricts storage for
+local files. The renderer writes atomically and refuses to replace an existing
+file or provenance sidecar unless `--overwrite` is explicit.
+
+Persist review history and get the current due queue locally:
+
+```bash
+classcorpus review cards.json
+classcorpus review cards.json --card CARD_ID --rating good --confidence 4
+classcorpus review cards.json --export-progress progress.json
+```
+
+The scheduler stores card fingerprints, source hashes, citations, intervals,
+confidence, and timestamps in the local ClassCorpus database, but not card text.
+When a cited source version changes, prior progress is reported as stale. The
+HTML deck embeds the same source-version card IDs, so its exported progress can
+be imported by `classcorpus review` and vice versa.
 
 CSV and TSV are optional interchange formats:
 
@@ -303,7 +340,20 @@ Render printable study guides with the `pdf` extra installed:
 
 ```bash
 python scripts/render_study_guide.py guide.md guide.pdf
+classcorpus verify-study guide.md --artifact guide.pdf
 ```
+
+The renderer writes the PDF atomically, renders every page with PyMuPDF before
+delivery, and refuses to replace either the PDF or provenance sidecar unless
+`--overwrite` is explicit. Add `--json` for page count, extracted-text count,
+output path, and manifest path. `classcorpus doctor` reports whether the optional
+PDF renderer dependencies are installed.
+
+`verify-study` checks cited claims, citation resolution, live source hashes,
+indexed-source representation, extraction warnings, artifact provenance, and
+whether each PDF page renders or the HTML parses in one local report. Same-stem
+PDF and HTML artifacts are detected automatically, so
+`classcorpus verify-study guide.md` is sufficient for the usual layout.
 
 See [references/flashcard-formats.md](https://github.com/haixinnn05/classcorpus/blob/main/references/flashcard-formats.md) for the
 normalized schema and output rules.

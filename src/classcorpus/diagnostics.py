@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import importlib.util
-from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
 import re
 import shutil
 import sqlite3
 import sys
 import sysconfig
 import tempfile
+from dataclasses import asdict, dataclass
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+from typing import Any
 
 from classcorpus.database import Database
 from classcorpus.parsers import supported_suffixes
@@ -25,13 +26,18 @@ class DiagnosticCheck:
     action: str | None = None
 
 
-def doctor_report() -> dict[str, object]:
+def doctor_report() -> dict[str, Any]:
     checks = [
         _python_check(),
         _fts_check(),
         _data_directory_check(),
         _database_check(),
         _console_entry_point_check(),
+        _optional_module_group_check(
+            "PDF study-guide renderer",
+            ("matplotlib", "PIL", "reportlab"),
+            'Install with: pip install -e ".[pdf]"',
+        ),
         _optional_module_check(
             "sentence-transformers",
             "sentence_transformers",
@@ -49,9 +55,7 @@ def doctor_report() -> dict[str, object]:
         ),
         _tesseract_executable_check(),
     ]
-    required_ok = all(
-        check.status == "pass" for check in checks if check.required
-    )
+    required_ok = all(check.status == "pass" for check in checks if check.required)
     reported_data_root, reported_database_path = _reported_paths()
     return {
         "ok": required_ok,
@@ -244,6 +248,25 @@ def _optional_module_check(
         required=False,
         message="Available." if available else "Not installed.",
         action=None if available else action,
+    )
+
+
+def _optional_module_group_check(
+    label: str,
+    modules: tuple[str, ...],
+    action: str,
+) -> DiagnosticCheck:
+    missing = [module for module in modules if importlib.util.find_spec(module) is None]
+    return DiagnosticCheck(
+        name=label,
+        status="optional" if missing else "pass",
+        required=False,
+        message=(
+            f"Missing: {', '.join(missing)}."
+            if missing
+            else "Available; generated PDFs are render-validated with PyMuPDF."
+        ),
+        action=action if missing else None,
     )
 
 

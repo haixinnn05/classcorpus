@@ -1,0 +1,138 @@
+{
+  "version": "1",
+  "courses": {
+    "Physics": {
+      "sources": [
+        "kinematics.md",
+        "vectors.md",
+        "physics-glossary.txt"
+      ]
+    },
+    "History": {
+      "sources": [
+        "reconstruction.md",
+        "industrialization.md",
+        "history-glossary.txt"
+      ]
+    },
+    "Biology": {
+      "sources": [
+        "cell-transport.md",
+        "enzyme-revision.md",
+        "biology-glossary.txt",
+        "membrane-diagram.pdf"
+      ]
+    }
+  },
+  "retrieval_cases": [
+    {
+      "id": "physics-constant-acceleration",
+      "course": "Physics",
+      "query": "constant acceleration equation avoids time displacement",
+      "source": "kinematics.md",
+      "ordinal": 1
+    },
+    {
+      "id": "physics-vector-components",
+      "course": "Physics",
+      "query": "counterclockwise vector components cosine sine",
+      "source": "vectors.md",
+      "ordinal": 1
+    },
+    {
+      "id": "history-reconstruction",
+      "course": "History",
+      "query": "Freedmen Bureau schools labor contracts medical care",
+      "source": "reconstruction.md",
+      "ordinal": 1
+    },
+    {
+      "id": "history-industrialization",
+      "course": "History",
+      "query": "Lowell mills textile wage labor boardinghouses",
+      "source": "industrialization.md",
+      "ordinal": 1
+    },
+    {
+      "id": "biology-osmosis",
+      "course": "Biology",
+      "query": "semipermeable membrane osmosis water concentration gradient",
+      "source": "cell-transport.md",
+      "ordinal": 1
+    },
+    {
+      "id": "biology-revised-enzyme",
+      "course": "Biology",
+      "query": "revised enzyme optimum thirty-two degrees invalidated",
+      "source": "enzyme-revision.md",
+      "ordinal": 1
+    }
+  ],
+  "unanswerable_cases": [
+    {
+      "id": "physics-absent-theorem",
+      "course": "Physics",
+      "query": "Noether Lagrangian symmetry"
+    },
+    {
+      "id": "history-absent-shogunate",
+      "course": "History",
+      "query": "Tokugawa sakoku shogunate"
+    },
+    {
+      "id": "biology-absent-editing",
+      "course": "Biology",
+      "query": "CRISPR Cas9 guide RNA"
+    }
+  ],
+  "synthesis_cases": [
+    {
+      "id": "history-labor-change",
+      "course": "History",
+      "query": "labor contracts schools textile wage labor boardinghouses",
+      "sources": [
+        "industrialization.md",
+        "reconstruction.md"
+      ]
+    },
+    {
+      "id": "physics-motion-representations",
+      "course": "Physics",
+      "query": "displacement constant acceleration vector components quadrant",
+      "sources": [
+        "kinematics.md",
+        "vectors.md"
+      ]
+    }
+  ],
+  "claim_cases": [
+    {
+      "id": "physics-supported-equation",
+      "claim": "For constant acceleration, v^2 = v0^2 + 2a delta x avoids time [Physics, kinematics.md, Page 1].",
+      "expected": "supported"
+    },
+    {
+      "id": "history-supported-programs",
+      "claim": "The Freedmen's Bureau supported schools, labor contracts, and medical care [History, reconstruction.md, Page 1].",
+      "expected": "supported"
+    },
+    {
+      "id": "biology-fabricated-temperature",
+      "claim": "The revised enzyme optimum was 37 degrees Celsius [Biology, enzyme-revision.md, Page 1].",
+      "expected": "unsupported"
+    }
+  ],
+  "visual_review_cases": [
+    {
+      "id": "biology-membrane-diagram",
+      "course": "Biology",
+      "source": "membrane-diagram.pdf",
+      "ordinal": 1,
+      "status": "review-needed",
+      "reasons": [
+        "low-native-text",
+        "embedded-image"
+      ]
+    }
+  ]
+}

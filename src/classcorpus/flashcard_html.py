@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from html import escape
 import json
 import os
-from pathlib import Path
 import re
 import tempfile
+from dataclasses import asdict
+from html import escape
+from pathlib import Path
 from typing import Sequence
 
 from classcorpus.flashcards import Flashcard
+from classcorpus.study_progress import CardIdentity, identify_card_content
 
 DEFAULT_TITLE = "Study Flashcards"
 
@@ -101,7 +102,8 @@ _DOCUMENT = """<!doctype html>
     .toolbar,
     .status,
     .navigation,
-    .rating {
+    .rating,
+    .confidence {
       display: flex;
       align-items: center;
       gap: 10px;
@@ -110,6 +112,12 @@ _DOCUMENT = """<!doctype html>
     .toolbar {
       flex-wrap: wrap;
       justify-content: flex-end;
+    }
+
+    .toolbar .secondary-action {
+      min-height: 38px;
+      padding: 6px 10px;
+      font-size: 0.8125rem;
     }
 
     label {
@@ -233,6 +241,14 @@ _DOCUMENT = """<!doctype html>
       margin-top: 16px;
     }
 
+    .confidence {
+      justify-content: center;
+    }
+
+    .confidence label {
+      width: min(100%, 300px);
+    }
+
     .navigation,
     .rating {
       justify-content: center;
@@ -337,7 +353,17 @@ _DOCUMENT = """<!doctype html>
             <option value="">All cards</option>
           </select>
         </label>
+        <label for="queue-filter">
+          Queue
+          <select id="queue-filter">
+            <option value="due">Due and new</option>
+            <option value="all">All cards</option>
+          </select>
+        </label>
         <button id="shuffle" type="button">Shuffle</button>
+        <button id="export-progress" class="secondary-action" type="button">Export progress</button>
+        <button id="import-progress" class="secondary-action" type="button">Import progress</button>
+        <input id="progress-file" type="file" accept="application/json,.json" hidden>
       </div>
     </header>
 
@@ -356,6 +382,19 @@ _DOCUMENT = """<!doctype html>
     </article>
 
     <div class="actions">
+      <div class="confidence">
+        <label for="confidence">
+          Confidence before reveal
+          <select id="confidence">
+            <option value="">Choose 1–5</option>
+            <option value="1">1 — guessing</option>
+            <option value="2">2 — unsure</option>
+            <option value="3">3 — somewhat sure</option>
+            <option value="4">4 — confident</option>
+            <option value="5">5 — very confident</option>
+          </select>
+        </label>
+      </div>
       <div class="navigation">
         <button id="previous" type="button">Previous</button>
         <button
@@ -368,8 +407,10 @@ _DOCUMENT = """<!doctype html>
         <button id="next" type="button">Next</button>
       </div>
       <div class="rating" id="rating" hidden>
-        <button id="review" class="review" type="button">Review again</button>
-        <button id="known" class="known" type="button">Know it</button>
+        <button id="again" class="review" type="button">Again</button>
+        <button id="hard" type="button">Hard</button>
+        <button id="good" class="known" type="button">Good</button>
+        <button id="easy" class="known" type="button">Easy</button>
       </div>
     </div>
 
@@ -389,8 +430,9 @@ _DOCUMENT = """<!doctype html>
       const source = JSON.parse(
         document.getElementById("flashcard-data").textContent
       );
-      const cards = source.map((card, index) => ({ ...card, id: index }));
+      const cards = source;
       const filter = document.getElementById("tag-filter");
+      const queueFilter = document.getElementById("queue-filter");
       const position = document.getElementById("position");
       const progress = document.getElementById("progress");
       const deckCount = document.getElementById("deck-count");
@@ -401,9 +443,13 @@ _DOCUMENT = """<!doctype html>
       const citation = document.getElementById("citation");
       const reveal = document.getElementById("reveal");
       const rating = document.getElementById("rating");
-      const ratings = new Map();
+      const confidence = document.getElementById("confidence");
+      const previous = document.getElementById("previous");
+      const next = document.getElementById("next");
+      const storageKey = `classcorpus:review:v1:${cards.map((card) => card.id).sort().join(":")}`;
+      let stored = loadStoredProgress();
 
-      let deck = cards.slice();
+      let deck = [];
       let current = 0;
       let revealed = false;
 
@@ -416,14 +462,68 @@ _DOCUMENT = """<!doctype html>
         filter.append(option);
       });
 
+      function loadStoredProgress() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(storageKey) || "null");
+          if (parsed && parsed.version === 1 && parsed.reviews && Array.isArray(parsed.events)) {
+            return parsed;
+          }
+        } catch (_) {
+          // A corrupt local entry should not prevent the deck from opening.
+        }
+        return { version: 1, reviews: {}, events: [] };
+      }
+
+      function persistProgress() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(stored));
+          return true;
+        } catch (_) {
+          progress.textContent = "Browser storage is unavailable; export progress before closing.";
+          return false;
+        }
+      }
+
+      function cardStatus(card, now = Date.now()) {
+        const state = stored.reviews[card.id];
+        if (!state) return "new";
+        return Date.parse(state.due_at) <= now ? "due" : "future";
+      }
+
+      function rebuildDeck() {
+        deck = cards.filter((card) => {
+          const topicMatches = !filter.value || card.tags.includes(filter.value);
+          const queueMatches = queueFilter.value === "all" || cardStatus(card) !== "future";
+          return topicMatches && queueMatches;
+        });
+        current = 0;
+        revealed = false;
+        render();
+      }
+
       function updateProgress() {
-        const values = [...ratings.values()];
-        const known = values.filter((value) => value === "known").length;
-        const review = values.filter((value) => value === "review").length;
-        progress.textContent = `${known} known · ${review} review`;
+        const statuses = cards.map((card) => cardStatus(card));
+        const due = statuses.filter((value) => value === "due").length;
+        const fresh = statuses.filter((value) => value === "new").length;
+        const scheduled = statuses.filter((value) => value === "future").length;
+        progress.textContent = `${due} due · ${fresh} new · ${scheduled} scheduled`;
       }
 
       function render() {
+        if (!deck.length) {
+          position.textContent = "Queue complete";
+          deckCount.textContent = `${cards.length} ${cards.length === 1 ? "card" : "cards"}`;
+          question.textContent = "No cards are due right now.";
+          answer.hidden = true;
+          rating.hidden = true;
+          reveal.hidden = true;
+          confidence.disabled = true;
+          previous.disabled = true;
+          next.disabled = true;
+          tags.replaceChildren();
+          updateProgress();
+          return;
+        }
         const card = deck[current];
         position.textContent = `Card ${current + 1} of ${deck.length}`;
         deckCount.textContent = `${cards.length} ${cards.length === 1 ? "card" : "cards"}`;
@@ -441,6 +541,11 @@ _DOCUMENT = """<!doctype html>
         answer.hidden = !revealed;
         rating.hidden = !revealed;
         reveal.hidden = revealed;
+        confidence.disabled = revealed;
+        if (!revealed) confidence.value = "";
+        reveal.disabled = !confidence.value;
+        previous.disabled = false;
+        next.disabled = false;
         reveal.setAttribute("aria-expanded", String(revealed));
         updateProgress();
       }
@@ -452,23 +557,76 @@ _DOCUMENT = """<!doctype html>
       }
 
       function showAnswer() {
-        if (revealed) return;
+        if (revealed || !confidence.value || !deck.length) return;
         revealed = true;
         render();
       }
 
-      function rate(value) {
-        ratings.set(deck[current].id, value);
-        move(1);
+      function schedule(value, state) {
+        let repetitions = state ? state.repetitions : 0;
+        let lapses = state ? state.lapses : 0;
+        let interval = state ? state.interval_days : 0;
+        let ease = state ? state.ease : 2.5;
+        if (value === "again") {
+          repetitions = 0;
+          lapses += 1;
+          interval = 10 / 1440;
+          ease = Math.max(1.3, ease - 0.2);
+        } else if (value === "hard") {
+          repetitions += 1;
+          interval = Math.max(1, interval * 1.2);
+          ease = Math.max(1.3, ease - 0.15);
+        } else if (value === "good") {
+          interval = repetitions === 0 ? 1 : repetitions === 1 ? 6 : Math.max(interval + 1, Math.round(interval * ease * 10) / 10);
+          repetitions += 1;
+        } else {
+          interval = repetitions === 0 ? 4 : repetitions === 1 ? 7 : Math.max(interval + 2, Math.round(interval * (ease + 0.3) * 10) / 10);
+          repetitions += 1;
+          ease += 0.15;
+        }
+        return { repetitions, lapses, interval, ease };
       }
 
-      filter.addEventListener("change", () => {
-        deck = filter.value
-          ? cards.filter((card) => card.tags.includes(filter.value))
-          : cards.slice();
-        current = 0;
-        revealed = false;
-        render();
+      function rate(value) {
+        if (!revealed || !deck.length) return;
+        const card = deck[current];
+        const reviewedAt = new Date();
+        const previousState = stored.reviews[card.id] || null;
+        const result = schedule(value, previousState);
+        const dueAt = new Date(reviewedAt.getTime() + result.interval * 86400000);
+        const createdAt = previousState ? previousState.created_at : reviewedAt.toISOString();
+        const review = {
+          card_id: card.id,
+          card_key: card.card_key,
+          source_sha256: card.source_sha256,
+          citation: card.citation,
+          repetitions: result.repetitions,
+          lapses: result.lapses,
+          interval_days: result.interval,
+          ease: result.ease,
+          due_at: dueAt.toISOString(),
+          last_reviewed_at: reviewedAt.toISOString(),
+          created_at: createdAt,
+          updated_at: reviewedAt.toISOString()
+        };
+        stored.reviews[card.id] = review;
+        stored.events.push({
+          card_id: card.id,
+          rating: value,
+          confidence: Number(confidence.value),
+          reviewed_at: reviewedAt.toISOString(),
+          previous_due_at: previousState ? previousState.due_at : null,
+          new_due_at: dueAt.toISOString()
+        });
+        persistProgress();
+        if (queueFilter.value === "due") rebuildDeck();
+        else move(1);
+      }
+
+      filter.addEventListener("change", rebuildDeck);
+      queueFilter.addEventListener("change", rebuildDeck);
+      confidence.addEventListener("change", () => {
+        reveal.disabled = !confidence.value;
       });
 
       document.getElementById("shuffle").addEventListener("click", () => {
@@ -480,11 +638,60 @@ _DOCUMENT = """<!doctype html>
         revealed = false;
         render();
       });
-      document.getElementById("previous").addEventListener("click", () => move(-1));
-      document.getElementById("next").addEventListener("click", () => move(1));
-      document.getElementById("review").addEventListener("click", () => rate("review"));
-      document.getElementById("known").addEventListener("click", () => rate("known"));
+      previous.addEventListener("click", () => move(-1));
+      next.addEventListener("click", () => move(1));
+      document.getElementById("again").addEventListener("click", () => rate("again"));
+      document.getElementById("hard").addEventListener("click", () => rate("hard"));
+      document.getElementById("good").addEventListener("click", () => rate("good"));
+      document.getElementById("easy").addEventListener("click", () => rate("easy"));
       reveal.addEventListener("click", showAnswer);
+
+      document.getElementById("export-progress").addEventListener("click", () => {
+        const payload = {
+          format: "classcorpus-study-progress",
+          version: 1,
+          exported_at: new Date().toISOString(),
+          reviews: Object.values(stored.reviews),
+          events: stored.events
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2) + "\\n"], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "classcorpus-progress.json";
+        link.click();
+        URL.revokeObjectURL(link.href);
+      });
+
+      const progressFile = document.getElementById("progress-file");
+      document.getElementById("import-progress").addEventListener("click", () => progressFile.click());
+      progressFile.addEventListener("change", async () => {
+        const file = progressFile.files[0];
+        if (!file) return;
+        try {
+          const imported = JSON.parse(await file.text());
+          if (imported.format !== "classcorpus-study-progress" || imported.version !== 1 || !Array.isArray(imported.reviews) || !Array.isArray(imported.events)) {
+            throw new Error("Unsupported progress file");
+          }
+          imported.reviews.forEach((review) => {
+            const existing = stored.reviews[review.card_id];
+            if (!existing || review.updated_at >= existing.updated_at) stored.reviews[review.card_id] = review;
+          });
+          const eventKeys = new Set(stored.events.map((event) => `${event.card_id}|${event.reviewed_at}|${event.rating}`));
+          imported.events.forEach((event) => {
+            const key = `${event.card_id}|${event.reviewed_at}|${event.rating}`;
+            if (!eventKeys.has(key)) {
+              stored.events.push(event);
+              eventKeys.add(key);
+            }
+          });
+          persistProgress();
+          rebuildDeck();
+        } catch (error) {
+          progress.textContent = `Import failed: ${error.message}`;
+        } finally {
+          progressFile.value = "";
+        }
+      });
 
       document.addEventListener("keydown", (event) => {
         if (event.target.matches("button, select")) return;
@@ -498,7 +705,7 @@ _DOCUMENT = """<!doctype html>
         }
       });
 
-      render();
+      rebuildDeck();
     })();
   </script>
 </body>
@@ -511,6 +718,7 @@ def render_flashcards_html(
     cards: Sequence[Flashcard],
     *,
     title: str = DEFAULT_TITLE,
+    identities: Sequence[CardIdentity] | None = None,
 ) -> str:
     values = list(cards)
     if not values:
@@ -518,8 +726,23 @@ def render_flashcards_html(
     clean_title = title.strip()
     if not clean_title:
         raise ValueError("flashcard deck title must not be blank")
+    identity_values = (
+        list(identities)
+        if identities is not None
+        else [identify_card_content(card) for card in values]
+    )
+    if len(identity_values) != len(values):
+        raise ValueError("flashcard identities must match the card count")
     payload = json.dumps(
-        [asdict(card) for card in values],
+        [
+            {
+                **asdict(card),
+                "id": identity.card_id,
+                "card_key": identity.card_key,
+                "source_sha256": identity.source_sha256,
+            }
+            for card, identity in zip(values, identity_values, strict=True)
+        ],
         ensure_ascii=False,
         separators=(",", ":"),
     )
@@ -545,13 +768,14 @@ def write_flashcards_html(
     path: Path,
     *,
     title: str = DEFAULT_TITLE,
+    identities: Sequence[CardIdentity] | None = None,
     overwrite: bool = False,
 ) -> None:
     if path.exists() and not overwrite:
         raise FileExistsError(
             f"output already exists: {path}; pass --overwrite to replace it"
         )
-    document = render_flashcards_html(cards, title=title)
+    document = render_flashcards_html(cards, title=title, identities=identities)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path: Path | None = None
     try:

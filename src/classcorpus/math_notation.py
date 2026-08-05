@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from classcorpus.citations import CITATION_PATTERN
+
 _MATRIX_ENVIRONMENT = re.compile(
     r"\\begin\{(?P<kind>matrix|bmatrix|Bmatrix|pmatrix|vmatrix|Vmatrix)\}"
     r"(?P<body>.*?)"
@@ -13,12 +15,7 @@ _BRACKET_MATRIX = re.compile(
     r"(?P<rows>\[[^\[\]]*\](?:\s*,\s*\[[^\[\]]*\])*)"
     r"\s*\]"
 )
-_TRANSPOSED_VECTOR = re.compile(
-    r"\[([^\[\]]+)\]\s*(?:\^\{T\}|\^T)"
-)
-_CITATION = re.compile(
-    r"^\[[^,\]]+,\s*[^,\]]+,\s*(?:Page|Pages|Slide|Slides)\b"
-)
+_TRANSPOSED_VECTOR = re.compile(r"\[([^\[\]]+)\]\s*(?:\^\{T\}|\^T)")
 _DISPLAY_COMMAND = re.compile(
     r"\\(?:frac|sum|int|sqrt|lim|prod|vec|begin\{[bBpPvV]?matrix\})"
 )
@@ -179,7 +176,7 @@ def normalize_inline_math(text: str) -> str:
 def looks_like_display_math(text: str) -> bool:
     """Conservatively identify standalone equations without catching prose."""
     value = strip_display_math_delimiters(text)
-    if not value or _CITATION.match(value):
+    if not value or CITATION_PATTERN.match(value):
         return False
     if _DISPLAY_COMMAND.search(value):
         return True
@@ -211,9 +208,7 @@ def _replace_latex_matrix(match: re.Match[str]) -> str:
     body = match.group("body").strip()
     raw_rows = re.split(r"\\\\(?:\[[^\]]*\])?", body)
     rows = [
-        [cell.strip() for cell in row.split("&")]
-        for row in raw_rows
-        if row.strip()
+        [cell.strip() for cell in row.split("&")] for row in raw_rows if row.strip()
     ]
     return _matrix_markup(rows, kind=match.group("kind"))
 
@@ -257,10 +252,7 @@ def _matrix_markup(rows: list[list[str]], *, kind: str) -> str:
     if any(len(row) != column_count for row in rows):
         raise ValueError("matrix rows must have the same number of columns")
 
-    body = r"\\".join(
-        r"\quad".join(_matrix_cell(cell) for cell in row)
-        for row in rows
-    )
+    body = r"\\".join(r"\quad".join(_matrix_cell(cell) for cell in row) for row in rows)
     contents = rf"\substack{{{body}}}"
     delimiters = {
         "matrix": ("", ""),

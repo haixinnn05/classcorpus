@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from typing import Any
 
 from classcorpus.database import Database
 from classcorpus.paths import data_root, database_path
@@ -28,7 +29,7 @@ def status_report(
     database: Database,
     *,
     course: str | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     parameters: list[object] = []
     where = ""
     if course is not None:
@@ -46,13 +47,9 @@ def status_report(
     statuses = tuple(_course_status(database, row) for row in course_rows)
     actions: list[str] = []
     if course is not None and not statuses:
-        actions.append(
-            f'Add the course with: classcorpus add "{course}" SOURCE_ROOT'
-        )
+        actions.append(f'Add the course with: classcorpus add "{course}" SOURCE_ROOT')
     elif not statuses:
-        actions.append(
-            'Add a course with: classcorpus add "COURSE" SOURCE_ROOT'
-        )
+        actions.append('Add a course with: classcorpus add "COURSE" SOURCE_ROOT')
     return {
         "ok": True,
         "data_root": str(data_root()),
@@ -118,13 +115,10 @@ def _course_status(database: Database, course_row) -> CourseStatus:
     name = str(course_row["name"])
     source_root = str(course_row["source_root"])
     if int(source_counts["failed"]):
-        actions.append(
-            f'Retry synchronization: classcorpus sync "{name}"'
-        )
+        actions.append(f'Retry synchronization: classcorpus sync "{name}"')
     if int(record_counts["review_needed"]):
         actions.append(
-            "Review extraction-risk records before relying on complete visual "
-            "coverage."
+            "Review extraction-risk records before relying on complete visual coverage."
         )
     if int(record_counts["ocr_failed"]):
         actions.append(
@@ -143,9 +137,7 @@ def _course_status(database: Database, course_row) -> CourseStatus:
         ocr_complete=int(record_counts["ocr_complete"]),
         ocr_failed=int(record_counts["ocr_failed"]),
         embedded_records=int(embedded_records),
-        embedding_models=tuple(
-            str(row["model_name"]) for row in embedding_rows
-        ),
+        embedding_models=tuple(str(row["model_name"]) for row in embedding_rows),
         next_actions=tuple(actions),
     )
 

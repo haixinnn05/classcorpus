@@ -38,6 +38,5 @@ def test_status_reports_embedding_models_and_review_work(
     assert status["embedded_records"] == 6
     assert status["embedding_models"] == ("hashing-v1:64",)
     assert status["next_actions"] == (
-        "Review extraction-risk records before relying on complete visual "
-        "coverage.",
+        "Review extraction-risk records before relying on complete visual coverage.",
     )

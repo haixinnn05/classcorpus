@@ -9,7 +9,7 @@ from classcorpus.models import SourceFingerprint
 from classcorpus.parsers import parse_source, supported_suffixes
 from classcorpus.paths import create_render_generation
 
-PARSER_VERSION = "6"
+PARSER_VERSION = "7"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,10 +57,7 @@ def sync_course(
         for path in root.rglob("*")
         if path.is_file() and path.suffix.lower() in supported_suffixes()
     )
-    present_relative_paths = {
-        source.relative_to(root).as_posix()
-        for source in sources
-    }
+    present_relative_paths = {source.relative_to(root).as_posix() for source in sources}
     _, cleanup_warnings = database.remove_missing_sources(
         course.id,
         present_relative_paths,
@@ -125,10 +122,7 @@ def sync_course(
                                 ),
                             }
                         )
-            if not any(
-                slide.render_path or slide.visual_assets
-                for slide in slides
-            ):
+            if not any(slide.render_path or slide.visual_assets for slide in slides):
                 source_warnings.extend(
                     database.cleanup_render_directories({render_dir})
                 )

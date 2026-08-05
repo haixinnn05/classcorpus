@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import hashlib
-from pathlib import Path
 import shlex
+from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Literal
 
 from classcorpus.database import Database
@@ -37,9 +37,7 @@ def inspect_record(
     limit: int = DEFAULT_INSPECT_CHARS,
 ) -> dict[str, Any]:
     if field not in RECORD_TEXT_FIELDS:
-        raise ValueError(
-            "field must be one of: " + ", ".join(RECORD_TEXT_FIELDS)
-        )
+        raise ValueError("field must be one of: " + ", ".join(RECORD_TEXT_FIELDS))
     chunk = read_record_text(
         database,
         course=course,
@@ -66,9 +64,7 @@ def inspect_record(
         indexed_sha256=str(row["sha256"]),
         indexed_parser_version=str(row["parser_version"]),
     )
-    render_path = (
-        str(row["render_path"]) if row["render_path"] is not None else None
-    )
+    render_path = str(row["render_path"]) if row["render_path"] is not None else None
     render_available = bool(render_path and Path(render_path).is_file())
     assets = [
         {

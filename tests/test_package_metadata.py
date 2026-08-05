@@ -2,7 +2,6 @@ import re
 import tomllib
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -40,3 +39,12 @@ def test_package_readme_uses_pypi_safe_links():
     ]
 
     assert not relative_links
+
+
+def test_package_ships_pep_561_type_information():
+    with (ROOT / "pyproject.toml").open("rb") as project_file:
+        config = tomllib.load(project_file)
+
+    assert (ROOT / "src" / "classcorpus" / "py.typed").is_file()
+    assert config["tool"]["setuptools"]["package-data"]["classcorpus"] == ["py.typed"]
+    assert "mypy>=1.15,<2" in config["project"]["optional-dependencies"]["dev"]

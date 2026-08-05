@@ -6,6 +6,7 @@ import re
 import shlex
 from typing import Any
 
+from classcorpus.citations import format_record_citation, logical_record_kind
 from classcorpus.database import Database
 from classcorpus.payloads import estimate_tokens, with_estimated_tokens
 from classcorpus.security import mark_untrusted_content
@@ -77,6 +78,8 @@ def outline_course(
             source_files.error_message AS source_error,
             slides.ordinal,
             slides.kind,
+            slides.start_ms,
+            slides.end_ms,
             slides.title,
             slides.extraction_status,
             slides.native_text_chars
@@ -148,9 +151,7 @@ def outline_course(
             }
         candidate_group = _public_group(group, source_id=source_id)
         candidate_groups = [*visible_groups, candidate_group]
-        candidate_returned = sum(
-            int(item["record_count"]) for item in candidate_groups
-        )
+        candidate_returned = sum(int(item["record_count"]) for item in candidate_groups)
         candidate_represented = consumed_before + candidate_returned
         candidate_has_more = index < len(groups) - 1
         candidate_cursor = (
@@ -200,9 +201,7 @@ def outline_course(
             payload["sources"] = candidate_sources
         visible_groups.append(candidate_group)
 
-    returned_records = sum(
-        int(group["record_count"]) for group in visible_groups
-    )
+    returned_records = sum(int(group["record_count"]) for group in visible_groups)
     represented = consumed_before + returned_records
     has_more = represented < int(summary["total_records"])
     next_cursor = None
@@ -257,10 +256,12 @@ def _group_rows(rows) -> list[dict[str, Any]]:
         if groups and groups[-1]["key"] == key:
             group = groups[-1]
             group["end_ordinal"] = int(row["ordinal"])
-            group["record_count"] += 1
-            group["review_needed"] += (
-                str(row["extraction_status"]) == "review-needed"
+            group["end_ms"] = int(row["end_ms"]) if row["end_ms"] is not None else None
+            group["end_start_ms"] = (
+                int(row["start_ms"]) if row["start_ms"] is not None else None
             )
+            group["record_count"] += 1
+            group["review_needed"] += str(row["extraction_status"]) == "review-needed"
             group["native_text_chars"] += int(row["native_text_chars"])
             continue
         groups.append(
@@ -278,11 +279,19 @@ def _group_rows(rows) -> list[dict[str, Any]]:
                 "start_ordinal": int(row["ordinal"]),
                 "end_ordinal": int(row["ordinal"]),
                 "record_count": 1,
-                "kind": str(row["kind"]),
-                "title": str(row["title"]),
-                "review_needed": int(
-                    str(row["extraction_status"]) == "review-needed"
+                "kind": logical_record_kind(
+                    str(row["kind"]),
+                    int(row["start_ms"]) if row["start_ms"] is not None else None,
                 ),
+                "start_ms": (
+                    int(row["start_ms"]) if row["start_ms"] is not None else None
+                ),
+                "end_ms": (int(row["end_ms"]) if row["end_ms"] is not None else None),
+                "end_start_ms": (
+                    int(row["start_ms"]) if row["start_ms"] is not None else None
+                ),
+                "title": str(row["title"]),
+                "review_needed": int(str(row["extraction_status"]) == "review-needed"),
                 "native_text_chars": int(row["native_text_chars"]),
             }
         )
@@ -290,14 +299,21 @@ def _group_rows(rows) -> list[dict[str, Any]]:
 
 
 def _public_group(group: dict[str, Any], *, source_id: str) -> dict[str, Any]:
-    label = "Slide" if group["kind"] == "slide" else "Page"
     start = int(group["start_ordinal"])
     end = int(group["end_ordinal"])
-    citation_start = (
-        f"[{group['course']}, {group['source_file']}, {label} {start}]"
+    citation_start = format_record_citation(
+        course=str(group["course"]),
+        source_file=str(group["source_file"]),
+        kind=str(group["kind"]),
+        ordinal=start,
+        start_ms=group["start_ms"],
     )
-    citation_end = (
-        f"[{group['course']}, {group['source_file']}, {label} {end}]"
+    citation_end = format_record_citation(
+        course=str(group["course"]),
+        source_file=str(group["source_file"]),
+        kind=str(group["kind"]),
+        ordinal=end,
+        start_ms=(group["end_start_ms"] if group["kind"] == "transcript" else None),
     )
     return {
         "source_id": source_id,
@@ -305,6 +321,8 @@ def _public_group(group: dict[str, Any], *, source_id: str) -> dict[str, Any]:
         "end_ordinal": end,
         "record_count": int(group["record_count"]),
         "kind": group["kind"],
+        "start_ms": group["start_ms"],
+        "end_ms": group["end_ms"],
         "title": group["title"],
         "review_needed": int(group["review_needed"]),
         "native_text_chars": int(group["native_text_chars"]),
@@ -399,8 +417,7 @@ def _decode_cursor(
         value = json.loads(payload.decode("utf-8"))
         if (
             not isinstance(value, dict)
-            or set(value)
-            != {"course", "scope_source", "source_file", "ordinal"}
+            or set(value) != {"course", "scope_source", "source_file", "ordinal"}
             or value["course"] != course
             or value["scope_source"] != source_file
             or not isinstance(value["source_file"], str)

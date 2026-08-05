@@ -25,7 +25,7 @@ python scripts/index_lectures.py COURSE SOURCE_ROOT --json
 
 Returns `indexed`, `skipped`, `failed`, `failures`, and actionable `warnings`.
 A registered parser plugin determines supported source suffixes. Built-in
-formats are PDF, PPTX, DOCX, UTF-8 Markdown, and UTF-8 plain text.
+formats are PDF, PPTX, DOCX, UTF-8 Markdown, UTF-8 plain text, WebVTT, and SRT.
 A partial sync exits 1 with `ok: false`, error type `PartialSyncError`, and the
 complete summary while preserving successfully indexed files. PPTX files
 retain native text and embedded image assets but do not produce a full-slide
@@ -41,8 +41,9 @@ python scripts/search_lectures.py QUERY [--course COURSE] \
   [--budget-tokens N] [--full] [--compact] --json
 ```
 
-Each compact result contains one-based ordinal, kind (`slide` or `page`),
-extraction state, score, bounded evidence, and a ready-to-use `citation`.
+Each compact result contains one-based ordinal, kind (`slide`, `page`, or
+`transcript`), optional transcript `start_ms` and `end_ms`, extraction state,
+score, bounded evidence, and a ready-to-use `citation`.
 `source_id` resolves course, source path, `source_status`, and optional
 `source_error` through the response-level `sources` map. Lexical results also
 expose `lexical_coverage`, `lexical_title_matches`, and
@@ -72,7 +73,8 @@ response. `--compact` is accepted as a deprecated no-op; `--full` restores
 complete result records.
 
 `--source` matches the source path relative to the indexed course root.
-`--ordinal` limits results to one one-based slide or page number.
+`--ordinal` limits results to one one-based record number. Transcript ordinals
+are stable read keys; user-facing citations use cue timestamps.
 
 Argument-validation failures also use the JSON error envelope and exit 1 when
 `--json` is present.
@@ -124,6 +126,7 @@ Returns `sources`, ordered `coverage` ranges, `total_records`,
 Consecutive records with the same normalized title and kind are grouped without
 crossing source boundaries. Each range preserves exact start/end ordinals,
 record count, endpoint citations, review count, native text size, and a bounded
+time range through `start_ms` and `end_ms` for transcript cues, plus a bounded
 read selector. Following cursors represents every record exactly once.
 
 ## Exhaustive Read
@@ -241,6 +244,19 @@ Tesseract word confidence, not calibrated certainty. Per-record failures are
 isolated, marked `failed`, and returned with a `PartialOCRFailure` envelope.
 Use `--retry-failed` after correcting the local dependency or image error.
 
+## Study Guide Rendering
+
+```text
+python scripts/render_study_guide.py SOURCE.md OUTPUT.pdf \
+  [--title TITLE] [--subtitle SUBTITLE] [--course-label COURSE] \
+  [--stat VALUE] [--overwrite] [--json]
+```
+
+The renderer writes atomically and validates that every page opens and renders
+before replacing the destination. JSON output includes `source`, `output`,
+`manifest`, `title`, `course_label`, and `delivery` page/text counts. Existing
+PDFs or provenance sidecars require explicit `--overwrite`.
+
 ## Remove Course Data
 
 ```text
@@ -260,9 +276,12 @@ python scripts/render_flashcards.py INPUT.json OUTPUT.html \
 ```
 
 Returns `rendered`, absolute `input`, absolute `output`, absolute `manifest`,
-and `title`. The self-contained HTML runs offline and keeps known/review state
-only in memory. A provenance sidecar is written beside the HTML. Existing
-output or sidecar is an error unless `--overwrite` is explicit.
+and `title`. The self-contained HTML runs offline, records confidence before
+reveal, schedules Again/Hard/Good/Easy ratings in browser-local storage, and
+exports or imports the same progress JSON used by `classcorpus review DECK`.
+Progress metadata contains stable card and source fingerprints, not card text.
+A provenance sidecar is written beside the HTML. Existing output or sidecar is
+an error unless `--overwrite` is explicit.
 
 ```text
 python scripts/convert_flashcards.py INPUT OUTPUT \

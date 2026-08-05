@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import Counter
 import re
+from collections import Counter
 from pathlib import Path
 
 from docx import Document
@@ -37,9 +37,7 @@ def parse_docx_document(path: Path, render_dir: Path) -> list[SlideRecord]:
         reasons.append("unmapped-ooxml-text")
     if document.element.xpath(".//*[local-name()='blip']"):
         reasons.append("embedded-image")
-    if document.element.xpath(
-        ".//*[local-name()='oMath' or local-name()='oMathPara']"
-    ):
+    if document.element.xpath(".//*[local-name()='oMath' or local-name()='oMathPara']"):
         reasons.append("equation-or-embedded-object")
 
     return [

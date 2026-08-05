@@ -49,4 +49,3 @@ class ParserRegistry:
 
 
 __all__ = ["ParserPlugin", "ParserRegistry"]
-

@@ -2,8 +2,56 @@
 
 ## Unreleased
 
+Target release: 0.7.0.
+
 ### Added
 
+- Add validated Claude Code plugin and marketplace manifests for repository
+  installation. `classcorpus script NAME ARGS` runs packaged agent helpers in
+  the installed runtime, fixing pipx isolation for script-backed workflows.
+- Detect and install the skill for Gemini CLI and GitHub Copilot CLI in addition
+  to Claude Code and Codex.
+- Add a realistic-semester scale benchmark with 180 sources, 560 records, 40
+  exact retrieval checks, and explicit gates for initial indexing, incremental
+  sync, median query latency, and p95 query latency.
+- Ship the `py.typed` marker and run mypy over all library modules. CI now checks
+  Python 3.13, subprocess-aware branch coverage with an 85% total floor, Ruff
+  Bugbear and import ordering, repository formatting, both benchmark tiers, and
+  cold wheel installs on Linux, macOS, and Windows.
+- Exercise simultaneous synchronization and search through separate SQLite
+  connections, with post-race record/source counts and integrity checks.
+- Index WebVTT and SRT lecture transcripts as one record per timed cue. Search,
+  focused and exact reads, outlines, claim checks, study verification,
+  flashcards, and provenance manifests now preserve canonical timestamp
+  citations such as `[Physics, lecture.vtt, 14:32.500]`; malformed or backwards
+  cues fail atomically instead of creating ambiguous evidence.
+- Verify a complete study source with `classcorpus verify-study SOURCE`. The
+  command combines claim support, citation resolution, cited-source freshness,
+  indexed-source representation, extraction warnings, uncited prose, and
+  same-stem PDF or HTML artifact provenance. Whole-course outputs can require
+  every indexed source with `--require-all-sources`.
+- Treat a citation-only Markdown paragraph as support for the preceding prose
+  paragraph, so claim checking evaluates common study-guide formatting instead
+  of scoring an empty citation as automatically supported.
+- Add an original, redistributable accuracy benchmark across Physics, History,
+  and Biology. It measures top-1 retrieval, citation formatting, cross-source
+  synthesis coverage, unanswerable-question refusal, claim verdicts, and visual
+  review signaling without publishing private course material.
+- Persist local flashcard schedules with `classcorpus review DECK`. Stable card
+  keys, source-version IDs, due dates, repetitions, lapses, confidence, and event
+  history survive sessions without storing card text; progress can be exported
+  and restored as JSON, and changed sources mark old progress stale.
+- Turn self-contained HTML flashcards into an adaptive offline study deck.
+  Confidence is captured before reveal; Again/Hard/Good/Easy ratings update a
+  due/new queue in browser-local storage; embedded source-version card IDs and
+  privacy-preserving progress export/import are compatible with
+  `classcorpus review`.
+- Validate study artifacts as deliverables, not only hashes. PDF verification
+  opens and renders every page; HTML verification decodes and parses the file;
+  unreadable hash-current artifacts now fail explicitly. The PDF renderer writes
+  atomically, protects existing PDF and sidecar files, validates before delivery,
+  supports structured JSON output, handles arbitrary table widths, and reports
+  missing optional dependencies through `classcorpus doctor`.
 - Check whether cited claims are supported by the records they cite with
   `classcorpus check-claims SOURCE`. `verify-artifact` detects a changed source;
   this detects a claim the cited record does not make, which is the case a
@@ -15,6 +63,9 @@
 
 ### Changed
 
+- Use SQLite write-ahead logging and a 30-second busy timeout so readers retain
+  stable snapshots during synchronization and bounded write contention waits
+  instead of failing immediately.
 - Restructure `SKILL.md` around routing and obligations, moving payload mechanics
   into the references that are loaded on demand. Every token in `SKILL.md` is
   charged against every workflow, and headroom under the context benchmark had

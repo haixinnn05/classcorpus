@@ -23,7 +23,7 @@ class VisualAsset:
 @dataclass(frozen=True, slots=True)
 class SlideRecord:
     ordinal: int
-    kind: Literal["slide", "page"]
+    kind: Literal["slide", "page", "transcript"]
     title: str
     body_text: str
     speaker_notes: str
@@ -35,6 +35,8 @@ class SlideRecord:
     render_path: str | None = None
     visual_description: str | None = None
     visual_assets: tuple[VisualAsset, ...] = ()
+    start_ms: int | None = None
+    end_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

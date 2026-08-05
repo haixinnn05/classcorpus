@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from _common import argument_parser, emit, fail
 from _embeddings import create_encoder
+
 from classcorpus.database import Database
 from classcorpus.payloads import (
     DEFAULT_SEARCH_BUDGET_TOKENS,
@@ -53,11 +54,7 @@ def main() -> int:
             course=args.course,
             source_file=args.source,
             ordinal=args.ordinal,
-            limit=(
-                args.limit
-                if args.limit is not None
-                else (8 if args.full else 6)
-            ),
+            limit=(args.limit if args.limit is not None else (8 if args.full else 6)),
             encoder=encoder,
         )
         health = database.source_health(args.course)
@@ -69,9 +66,7 @@ def main() -> int:
                 "source_file": result.source_file,
                 "ordinal": str(result.ordinal),
                 "reasons": list(result.extraction_reasons),
-                "message": (
-                    "Returned evidence may have incomplete native extraction."
-                ),
+                "message": ("Returned evidence may have incomplete native extraction."),
             }
             for result in results
             if result.extraction_status == "review-needed"
@@ -81,9 +76,7 @@ def main() -> int:
             results,
             warnings=warnings,
             sync_required=health.total == 0 or health.failed > 0,
-            suggested_terms=(
-                [] if results else suggest_terms(database, args.query)
-            ),
+            suggested_terms=([] if results else suggest_terms(database, args.query)),
             message=message,
             full=args.full,
             budget_tokens=args.budget_tokens,

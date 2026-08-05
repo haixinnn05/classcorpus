@@ -37,8 +37,7 @@ def write(tmp_path: Path, body: str) -> Path:
 def test_a_true_claim_is_supported(course: Database, tmp_path: Path):
     source = write(
         tmp_path,
-        "Bellman-Ford relaxes every edge V - 1 times "
-        "[Algorithms, paths.md, Page 1].\n",
+        "Bellman-Ford relaxes every edge V - 1 times [Algorithms, paths.md, Page 1].\n",
     )
 
     payload = check_claims(course, source)
@@ -95,8 +94,7 @@ def test_an_invented_number_is_unsupported(course: Database, tmp_path: Path):
 def test_unrelated_wording_is_flagged_as_weak(course: Database, tmp_path: Path):
     source = write(
         tmp_path,
-        "Quantum entanglement accelerates traversal "
-        "[Algorithms, paths.md, Page 1].\n",
+        "Quantum entanglement accelerates traversal [Algorithms, paths.md, Page 1].\n",
     )
 
     payload = check_claims(course, source)
@@ -133,6 +131,55 @@ def test_each_citation_in_a_paragraph_is_checked_separately(
 
     assert payload["claims_total"] == 2
     assert verdicts == ["supported", "unsupported"]
+
+
+def test_citation_only_paragraph_checks_the_preceding_markdown_paragraph(
+    course: Database,
+    tmp_path: Path,
+):
+    source = write(
+        tmp_path,
+        "Bellman-Ford relaxes every edge V - 1 times.\n\n"
+        "[Algorithms, paths.md, Page 1]\n",
+    )
+
+    payload = check_claims(course, source)
+
+    assert payload["claims_total"] == 1
+    assert payload["claims"][0]["line"] == 1
+    assert payload["claims"][0]["claim"].startswith("Bellman-Ford relaxes")
+    assert payload["claims"][0]["verdict"] == "supported"
+
+
+def test_citation_only_paragraph_does_not_hide_an_invented_measurement(
+    course: Database,
+    tmp_path: Path,
+):
+    source = write(
+        tmp_path,
+        "Bellman-Ford runs in O(V log V).\n\n[Algorithms, paths.md, Page 1]\n",
+    )
+
+    payload = check_claims(course, source)
+
+    assert payload["claims"][0]["verdict"] == "unsupported"
+    assert payload["claims"][0]["missing_measurements"] == ["O(V log V)"]
+
+
+def test_bold_answer_number_is_not_treated_as_a_claimed_measurement(
+    course: Database,
+    tmp_path: Path,
+):
+    source = write(
+        tmp_path,
+        "**9.** Dijkstra requires non-negative edge weights.\n\n"
+        "[Algorithms, paths.md, Page 1]\n",
+    )
+
+    payload = check_claims(course, source)
+
+    assert payload["claims"][0]["missing_measurements"] == []
+    assert payload["claims"][0]["verdict"] == "supported"
 
 
 def test_list_items_and_line_numbers_are_reported(course: Database, tmp_path: Path):

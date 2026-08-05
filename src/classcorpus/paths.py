@@ -28,13 +28,7 @@ def render_directory(
 ) -> Path:
     slug = re.sub(r"[^a-z0-9]+", "-", course.lower()).strip("-") or "course"
     version = parser_version.encode("utf-8").hex() or "empty"
-    return (
-        data_root()
-        / "renders"
-        / slug
-        / f"parser-{version}"
-        / content_hash
-    )
+    return data_root() / "renders" / slug / f"parser-{version}" / content_hash
 
 
 def create_render_generation(

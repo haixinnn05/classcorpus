@@ -8,7 +8,13 @@ Canonical forms:
 ```text
 [Algorithms, Lecture08.pptx, Slide 27]
 [Algorithms, handout.pdf, Page 3]
+[Algorithms, Lecture08.vtt, 14:32]
+[Algorithms, seminar.srt, 01:14:32.500]
 ```
+
+Transcript citations use the exact cue start time. Hours are included only
+when nonzero, and milliseconds only when nonzero. Keep the returned timestamp
+unchanged; use the record's one-based `ordinal` for `read` and `inspect`.
 
 ## Grounding
 

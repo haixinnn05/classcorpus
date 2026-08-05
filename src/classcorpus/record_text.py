@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from typing import Literal
 
+from classcorpus.citations import format_record_citation, logical_record_kind
 from classcorpus.database import Database
 from classcorpus.models import ExtractionStatus
 
@@ -47,6 +48,8 @@ class RecordTextChunk:
     has_more: bool
     next_offset: int | None
     citation: str
+    start_ms: int | None = None
+    end_ms: int | None = None
 
 
 def read_record_text(
@@ -62,15 +65,11 @@ def read_record_text(
     if ordinal < 1:
         raise ValueError("ordinal must be at least 1")
     if field not in RECORD_TEXT_FIELDS:
-        raise ValueError(
-            "field must be one of: " + ", ".join(RECORD_TEXT_FIELDS)
-        )
+        raise ValueError("field must be one of: " + ", ".join(RECORD_TEXT_FIELDS))
     if offset < 0:
         raise ValueError("offset must not be negative")
     if limit < 1 or limit > MAX_CHUNK_CHARS:
-        raise ValueError(
-            f"limit must be between 1 and {MAX_CHUNK_CHARS}"
-        )
+        raise ValueError(f"limit must be between 1 and {MAX_CHUNK_CHARS}")
     row = database.connection.execute(
         """
         SELECT
@@ -82,6 +81,8 @@ def read_record_text(
             source_files.error_message AS source_error,
             slides.ordinal,
             slides.kind,
+            slides.start_ms,
+            slides.end_ms,
             slides.title,
             slides.body_text,
             slides.speaker_notes,
@@ -109,7 +110,8 @@ def read_record_text(
     text = complete_text[offset : offset + limit]
     next_offset = offset + len(text)
     has_more = next_offset < len(complete_text)
-    label = "Slide" if row["kind"] == "slide" else "Page"
+    start_ms = int(row["start_ms"]) if row["start_ms"] is not None else None
+    kind = logical_record_kind(str(row["kind"]), start_ms)
     return RecordTextChunk(
         slide_id=int(row["slide_id"]),
         course=str(row["course"]),
@@ -117,12 +119,12 @@ def read_record_text(
         source_path=str(row["source_path"]),
         source_status=str(row["source_status"]),
         source_error=(
-            str(row["source_error"])
-            if row["source_error"] is not None
-            else None
+            str(row["source_error"]) if row["source_error"] is not None else None
         ),
         ordinal=int(row["ordinal"]),
-        kind=str(row["kind"]),
+        kind=kind,
+        start_ms=start_ms,
+        end_ms=(int(row["end_ms"]) if row["end_ms"] is not None else None),
         title=str(row["title"]),
         extraction_status=row["extraction_status"],
         extraction_reasons=tuple(json.loads(row["extraction_reasons"])),
@@ -133,9 +135,12 @@ def read_record_text(
         returned_chars=len(text),
         has_more=has_more,
         next_offset=next_offset if has_more else None,
-        citation=(
-            f"[{row['course']}, {row['source_file']}, "
-            f"{label} {row['ordinal']}]"
+        citation=format_record_citation(
+            course=str(row["course"]),
+            source_file=str(row["source_file"]),
+            kind=kind,
+            ordinal=int(row["ordinal"]),
+            start_ms=start_ms,
         ),
     )
 
@@ -150,9 +155,7 @@ def _selected_text(row, field: RecordTextField) -> str:
         ("Visual description", row["visual_description"]),
         ("OCR", row["ocr_text"]),
     ]
-    return "\n\n".join(
-        f"{label}:\n{value}" for label, value in parts if value
-    )
+    return "\n\n".join(f"{label}:\n{value}" for label, value in parts if value)
 
 
 __all__ = [

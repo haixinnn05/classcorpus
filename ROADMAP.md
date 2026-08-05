@@ -9,25 +9,12 @@ and the order can change. If you want to take one on, open an issue first so the
 approach can be agreed before code is written. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Distribution
-
-- **Publish a Claude Code plugin manifest** so the skill is installable from the
-  plugin marketplace.
-- **Support more agents in `install-skill`.** Only Claude Code and Codex skill
-  directories are known. Adding an agent should require one table entry.
-
 ## Formats
 
-- **Lecture recording transcripts.** Parse WebVTT and SRT with timestamp-based
-  citations, for example `[Algorithms, Lecture08.vtt, 14:32]`. Recordings hold a
-  large share of current course material and fit the existing `ParserPlugin`
-  contract.
 - **HTML and EPUB** for online textbooks and course sites.
 
 ## Study Outputs
 
-- **Persistent spaced repetition.** Flashcard review state is session-only.
-  Store review history locally and export to Anki.
 - **Deep-linked citations** that open the cited source at the exact page from
   generated HTML and PDF artifacts.
 
@@ -37,24 +24,6 @@ approach can be agreed before code is written. See
   charged against every workflow and is only a request the agent may ignore, while
   a command is a guarantee. Prefer adding a command that enforces a rule over
   prose that asks for it, and keep payload mechanics in the references.
-
-## Engineering
-
-- **Measure subprocess coverage.** CLI tests run through `subprocess`, so
-  `cli.py` reports no coverage even though it is exercised. Use parallel-mode
-  coverage with a subprocess hook, then gate on the corrected total.
-- **Ship type information.** Modules are annotated, but there is no `py.typed`
-  marker, so library consumers get nothing. Add the marker and check with a
-  static type checker in CI.
-- **Widen lint coverage** beyond the current pycodestyle and pyflakes subset,
-  and check formatting.
-- **Close CI gaps.** Test Python 3.13, which the package classifiers claim.
-  Run the benchmark in CI, which `CONTRIBUTING.md` requires before every change.
-  Add a cold-install smoke test on every supported operating system.
-- **Test concurrent access.** Agents can synchronize and search the same SQLite
-  database at once; there is no locking or concurrency test.
-- **Add a scale benchmark.** The published corpus is small. Add a
-  realistic-semester tier with index-time and query-latency thresholds.
 
 ## Under Consideration
 
@@ -66,6 +35,31 @@ approach can be agreed before code is written. See
 
 ## Completed
 
+- A validated Claude Code plugin and self-hosted marketplace manifest, plus a
+  package-environment script launcher that keeps pipx and plugin workflows usable
+- Skill installation for Claude Code, Codex, Gemini CLI, and GitHub Copilot CLI
+- Subprocess-aware branch coverage with an 85% total gate, including real CLI
+  execution instead of treating `cli.py` as untouched
+- PEP 561 type information and a clean mypy gate across the public library
+- Ruff Bugbear and import-order linting plus repository-wide format checks
+- Python 3.13 quality CI, default benchmark CI, and clean-wheel smoke tests on
+  Linux, macOS, and Windows
+- Concurrent sync/search safety with SQLite WAL, bounded busy waits, race tests,
+  and post-race integrity checks
+- A realistic-semester scale tier with 180 sources, 560 records, exact retrieval,
+  and explicit index, incremental-sync, median-query, and p95-query thresholds
+- WebVTT and SRT lecture transcripts with one record per cue, exact start/end
+  milliseconds, timestamp citations, and verification across all evidence paths
+- Unified claim, citation, source, coverage, and artifact verification with
+  `verify-study`
+- A multi-domain accuracy benchmark for retrieval, citations, synthesis,
+  unanswerable questions, claim checking, and visual-review signaling
+- Persistent local flashcard scheduling with source-version staleness and
+  progress backup/restore
+- Adaptive offline HTML decks with confidence-before-reveal, due/new queues,
+  Again/Hard/Good/Easy scheduling, and CLI-compatible progress exchange
+- Render-validated PDF and HTML delivery checks, atomic PDF creation,
+  overwrite protection, structured renderer output, and dependency diagnostics
 - Checked cited claims against the records they cite with `check-claims`
 - Installed the complete Agent Skill from the published package with
   `classcorpus install-skill`
@@ -81,7 +75,7 @@ approach can be agreed before code is written. See
 - Compact, budgeted retrieval by default with a lossless `--full` opt-out
 - Query-centered focused reads and bounded, resumable evidence reads
 - Explainable lexical reranking and local typo suggestions
-- Self-contained interactive HTML flashcard decks, plus CSV and TSV helpers
+- Self-contained adaptive HTML flashcard decks, plus CSV and TSV helpers
 - A unified CLI with course status and environment diagnostics
 - Isolated parser plugins for Markdown and plain-text lectures
 - Optional local OCR with explicit, uncalibrated confidence reporting

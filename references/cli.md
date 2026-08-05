@@ -9,7 +9,7 @@ renamed environment has broken the generated console script.
 ## Core Commands
 
 ```text
-classcorpus install-skill [--agent {claude,codex}] [--target PATH] \
+classcorpus install-skill [--agent {claude,codex,copilot,gemini}] [--target PATH] \
   [--overwrite] [--json]
 classcorpus demo [--course COURSE] [--dir PATH] [--query QUERY] \
   [--overwrite] [--json]
@@ -29,11 +29,31 @@ classcorpus manifest ARTIFACT --citations-from INPUT \
   [--overwrite] [--json]
 classcorpus check-claims SOURCE [--field FIELD] [--threshold N] [--json]
 classcorpus verify-artifact ARTIFACT [--json]
+classcorpus verify-study SOURCE [--artifact ARTIFACT] \
+  [--require-all-sources] [--json]
+classcorpus review DECK [--card ID --rating RATING] [--confidence 1..5] \
+  [--export-progress PATH | --import-progress PATH] [--overwrite] [--json]
+classcorpus script NAME [SCRIPT_ARGUMENTS...]
 classcorpus outline COURSE [--source PATH] [--cursor CURSOR] \
   [--budget-tokens N] [--json]
 classcorpus status [--course COURSE] [--json]
 classcorpus doctor [--json]
 ```
+
+## Bundled Agent Scripts
+
+`classcorpus script NAME ARGS` runs a packaged agent-facing script with the
+same Python interpreter and dependencies as the installed CLI. This is the
+reliable route for pipx and plugin installs, where a system `python` cannot see
+the isolated ClassCorpus package. For example:
+
+```text
+classcorpus script retrieve_focused "Bellman-Ford" --course Algorithms --json
+classcorpus script render_flashcards cards.json cards.html --json
+```
+
+Names are restricted to the public scripts bundled with the installed version;
+helper modules and arbitrary file paths cannot be executed through this command.
 
 ## Install Skill
 
@@ -47,10 +67,12 @@ from `CLAUDE_HOME` or `CODEX_HOME` when set, and otherwise `~/.claude` or
 `~/.codex`. An agent is detected when its home directory exists.
 
 With no arguments, the skill is installed for **every** detected agent, since a
-user running both Claude Code and Codex wants it in both. `--agent` narrows that
-to one, and `--target` installs into an exact directory instead. When no agent is
-detected, the command fails and names both options. JSON output reports one entry
-per destination under `installations`.
+a user running several supported agents wants it in each. The recognized
+personal homes are `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/skills`,
+and `~/.copilot/skills`. `--agent` narrows installation to one, and `--target`
+installs into an exact directory instead. When no agent is detected, the command
+fails and names both options. JSON output reports one entry per destination
+under `installations`.
 
 Directory assets are replaced rather than merged, so files removed in a later
 version do not linger. Reinstalling over a previous ClassCorpus skill is allowed;
@@ -127,6 +149,10 @@ extraction status, total and returned character counts, `has_more`, and
 `next_offset`. Human output prints the evidence and an exact continuation
 command only when more text remains.
 
+Transcript records report `kind: "transcript"`, `start_ms`, and `end_ms`, while
+their canonical citation uses the cue start time. The one-based ordinal remains
+the argument used by `read` and `inspect`.
+
 ## Retrieve
 
 `classcorpus retrieve QUERY --course COURSE --json` combines three ranked
@@ -139,7 +165,7 @@ within the current task.
 
 ## Inspect
 
-`inspect` returns bounded evidence for one exact page or slide and verifies the
+`inspect` returns bounded evidence for one exact page, slide, or transcript cue and verifies the
 current source against its indexed SHA-256 and parser version. It reports
 `current`, `changed`, `missing`, `stale-parser`, or `unavailable`, plus the
 original path, extraction warnings, render availability, embedded visual
@@ -196,12 +222,47 @@ The check is lexical and local. It is a support signal, not proof of entailment:
 a correct paraphrase can score low, and agreeing wording does not make a claim
 true. Treat flagged claims as requiring review against the cited record.
 
+## Verify Study
+
+`verify-study` combines `check-claims`, live cited-source hashes, citation
+resolution, indexed-source representation, extraction-review warnings, and
+artifact provenance. When `--artifact` is omitted, a same-stem PDF or HTML file
+is verified automatically when present.
+
+The command fails for missing citations, unsupported or unverified claims,
+unresolved citations, changed or missing sources, failed source refreshes, and
+invalid artifact manifests. Weak claims and uncited prose are advisory. Use
+`--require-all-sources` when every indexed source in each cited course must be
+represented; otherwise incomplete representation is a warning.
+
+Artifact checks are delivery checks as well as hash checks. Every PDF page must
+open and render locally with PyMuPDF, and HTML must decode as UTF-8 and contain
+parseable elements. A hash-current file that cannot be opened reports
+`artifact-unreadable`.
+
+## Persistent Review
+
+`review DECK` lists new, due, future, and stale cards. Rate a current card with
+`--card ID --rating again|hard|good|easy`; optional confidence is an integer from
+1 to 5. The deterministic local scheduler records repetitions, lapses,
+intervals, ease, due time, source version, and an event history. It is a study
+queue, not a claim of mastery.
+
+Card content determines a stable key, while the indexed source hash determines
+the current card ID. A source change therefore preserves the ability to report
+old progress as stale without silently applying it to revised evidence.
+`--export-progress` writes a portable JSON backup without card text, and
+`--import-progress` restores it. Existing exports require `--overwrite`.
+
 ## Outline
 
 `outline` returns an ordered coverage ledger without full record bodies.
 Consecutive records from one source with matching normalized titles are grouped
-into exact ordinal ranges. Every slide/page is represented once through
+into exact ordinal ranges. Every slide, page, or transcript cue is represented once through
 `start_ordinal`, `end_ordinal`, and `record_count`.
+
+Transcript ranges additionally expose `start_ms` and `end_ms`; their endpoint
+citations identify the first and last cue start times.
 
 The default budget is 1,500 estimated tokens. Follow `next_cursor` until
 `has_more` is false, then read only selected ranges. Citations, warnings,
@@ -230,10 +291,10 @@ and the exact `classcorpus add` command to start.
 - writable generated-data directory;
 - initializable ClassCorpus database.
 
-Sentence-transformers, FastEmbed, the Python OCR adapter, and the Tesseract
-executable are optional checks. Their absence is reported with installation
-guidance but does not fail the command. A required failure makes `ok` false and
-the process exits nonzero.
+The PDF study-guide renderer, sentence-transformers, FastEmbed, the Python OCR
+adapter, and the Tesseract executable are optional checks. Their absence is
+reported with installation guidance but does not fail the command. A required
+failure makes `ok` false and the process exits nonzero.
 
 The console entry point is also checked but is not required. Moving or renaming
 an environment leaves the generated `classcorpus` script pointing at an

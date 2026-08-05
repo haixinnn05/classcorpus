@@ -44,7 +44,7 @@ class SearchResult:
     source_status: str
     source_error: str | None
     ordinal: int
-    kind: Literal["slide", "page"]
+    kind: Literal["slide", "page", "transcript"]
     title: str
     body_text: str
     speaker_notes: str
@@ -66,6 +66,8 @@ class SearchResult:
     lexical_title_matches: int = 0
     lexical_phrase_match: bool = False
     visual_assets: tuple[VisualAsset, ...] = ()
+    start_ms: int | None = None
+    end_ms: int | None = None
 
 
 def search(
@@ -110,6 +112,8 @@ def search(
             source_files.error_message AS source_error,
             slides.ordinal,
             slides.kind,
+            slides.start_ms,
+            slides.end_ms,
             slides.title,
             slides.body_text,
             slides.speaker_notes,
@@ -291,13 +295,11 @@ def reciprocal_rank_fusion(
 
 def _row_to_search_result(database: Database, row) -> SearchResult:
     values = dict(row)
-    values["extraction_reasons"] = tuple(
-        json.loads(values["extraction_reasons"])
-    )
+    values["extraction_reasons"] = tuple(json.loads(values["extraction_reasons"]))
     values["has_visual_content"] = bool(values["has_visual_content"])
-    values["visual_assets"] = database.visual_assets_for_slide(
-        int(values["slide_id"])
-    )
+    if values["start_ms"] is not None:
+        values["kind"] = "transcript"
+    values["visual_assets"] = database.visual_assets_for_slide(int(values["slide_id"]))
     return SearchResult(**values)
 
 
@@ -317,6 +319,8 @@ def _results_by_id(
             source_files.error_message AS source_error,
             slides.ordinal,
             slides.kind,
+            slides.start_ms,
+            slides.end_ms,
             slides.title,
             slides.body_text,
             slides.speaker_notes,
@@ -341,10 +345,7 @@ def _results_by_id(
         """,
         slide_ids,
     ).fetchall()
-    return {
-        int(row["slide_id"]): _row_to_search_result(database, row)
-        for row in rows
-    }
+    return {int(row["slide_id"]): _row_to_search_result(database, row) for row in rows}
 
 
 __all__ = [

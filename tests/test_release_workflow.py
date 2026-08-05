@@ -2,13 +2,20 @@ from pathlib import Path
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "release.yml"
+TEST_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "test.yml"
 
 
 def load_workflow() -> dict:
     return yaml.load(WORKFLOW_PATH.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+
+
+def load_test_workflow() -> dict:
+    return yaml.load(
+        TEST_WORKFLOW_PATH.read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
 
 
 def test_release_workflow_has_safe_triggers_and_permissions():
@@ -98,3 +105,39 @@ def test_dependabot_covers_actions_and_python_dependencies():
     for update in config["updates"]:
         assert update["directory"] == "/"
         assert update["schedule"]["interval"] in {"daily", "weekly", "monthly"}
+
+
+def test_ci_covers_typing_format_coverage_benchmarks_and_cold_installs():
+    jobs = load_test_workflow()["jobs"]
+    quality = jobs["quality"]
+    quality_commands = "\n".join(step.get("run", "") for step in quality["steps"])
+
+    assert quality["runs-on"] == "ubuntu-latest"
+    assert any(
+        step.get("with", {}).get("python-version") == "3.13"
+        for step in quality["steps"]
+    )
+    for command in (
+        "ruff check",
+        "ruff format --check",
+        "mypy",
+        "coverage run -m pytest",
+        "coverage combine",
+        "coverage report",
+        "python -m benchmarks.run",
+        "python -m benchmarks.scale",
+    ):
+        assert command in quality_commands
+
+    cold_install = jobs["cold-install"]
+    assert cold_install["strategy"]["matrix"]["os"] == [
+        "ubuntu-latest",
+        "macos-latest",
+        "windows-latest",
+    ]
+    cold_commands = "\n".join(step.get("run", "") for step in cold_install["steps"])
+    assert "python -m build" in cold_commands
+    assert "pip install dist/*.whl" in cold_commands
+    assert "classcorpus doctor --json" in cold_commands
+    assert "classcorpus script read_lectures" in cold_commands
+    assert "py.typed" in cold_commands

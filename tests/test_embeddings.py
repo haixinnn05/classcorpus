@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 
 from classcorpus.database import Database
-from classcorpus.encoders import HashingEncoder
 from classcorpus.embeddings import build_embeddings
+from classcorpus.encoders import HashingEncoder
 from classcorpus.indexer import sync_course
 from classcorpus.search import reciprocal_rank_fusion, search
 from tests.fixtures.make_fixtures import make_pptx_fixture
@@ -70,13 +70,16 @@ def test_hybrid_search_honors_source_and_ordinal_filters(indexed_course: Databas
     assert [(result.source_file, result.ordinal) for result in results] == [
         ("Lecture08.pptx", 1)
     ]
-    assert search(
-        indexed_course,
-        "cached recursion",
-        course="Algorithms",
-        source_file="missing.pptx",
-        encoder=FakeEncoder(),
-    ) == []
+    assert (
+        search(
+            indexed_course,
+            "cached recursion",
+            course="Algorithms",
+            source_file="missing.pptx",
+            encoder=FakeEncoder(),
+        )
+        == []
+    )
 
 
 def test_rank_fusion_rewards_results_in_both_rankings():

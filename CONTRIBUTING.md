@@ -14,8 +14,14 @@ Run the release checks before submitting a change:
 
 ```bash
 .venv/bin/ruff check benchmarks src scripts tests
-.venv/bin/python -m pytest -q
+.venv/bin/ruff format --check benchmarks src scripts tests
+.venv/bin/mypy
+.venv/bin/coverage erase
+.venv/bin/coverage run -m pytest -q
+.venv/bin/coverage combine
+.venv/bin/coverage report
 .venv/bin/python -m benchmarks.run
+.venv/bin/python -m benchmarks.scale
 ```
 
 ## Change Workflow
@@ -34,7 +40,7 @@ Run the release checks before submitting a change:
 - Keep baseline search usable without embeddings or cloud APIs.
 - Never modify lecture source files.
 - Keep visual analysis opt-in and provider-neutral.
-- Preserve exact source paths and one-based page/slide citations.
+- Preserve exact source paths and canonical page, slide, or timestamp citations.
 
 ## Test Materials
 

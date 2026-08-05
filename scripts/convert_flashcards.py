@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from _common import argument_parser, emit, fail
+
 from classcorpus.flashcards import export_flashcards, load_flashcards
 
 
@@ -48,4 +49,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -72,8 +72,7 @@ def test_outline_groups_matching_consecutive_titles(tmp_path: Path):
     )
 
     assert [
-        (group["start_ordinal"], group["end_ordinal"])
-        for group in payload["coverage"]
+        (group["start_ordinal"], group["end_ordinal"]) for group in payload["coverage"]
     ] == [(1, 2), (3, 3), (4, 4)]
     assert payload["coverage"][0]["record_count"] == 2
     assert payload["coverage"][0]["review_needed"] == 1
@@ -94,9 +93,7 @@ def test_outline_cursor_covers_every_record_once(tmp_path: Path):
             budget_tokens=500,
         )
         for group in payload["coverage"]:
-            represented.extend(
-                range(group["start_ordinal"], group["end_ordinal"] + 1)
-            )
+            represented.extend(range(group["start_ordinal"], group["end_ordinal"] + 1))
         if not payload["has_more"]:
             break
         assert payload["budget_exhausted"] is True

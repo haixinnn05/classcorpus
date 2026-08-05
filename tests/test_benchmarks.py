@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from benchmarks.accuracy import generate_accuracy_corpus, load_accuracy_manifest
 from benchmarks.generate import generate_corpus
 from benchmarks.run import load_manifest, run_benchmark
 
@@ -9,7 +10,9 @@ def test_generated_corpus_matches_published_source_manifest(tmp_path: Path):
     generated = generate_corpus(tmp_path)
 
     assert set(generated) == set(manifest["sources"])
-    assert all(path.is_file() and path.stat().st_size > 0 for path in generated.values())
+    assert all(
+        path.is_file() and path.stat().st_size > 0 for path in generated.values()
+    )
 
 
 def test_extraction_and_retrieval_benchmark_passes(tmp_path: Path):
@@ -36,3 +39,23 @@ def test_extraction_and_retrieval_benchmark_passes(tmp_path: Path):
     assert efficiency["reductions"]["adaptive_vs_standard"] >= 0.25
     assert efficiency["reductions"]["adaptive_vs_full"] >= 0.70
     assert efficiency["failures"] == []
+    accuracy = result["accuracy"]
+    assert accuracy["passed"] is True
+    assert accuracy["retrieval"]["recall_at_5"] == 1.0
+    assert accuracy["retrieval"]["top_1_accuracy"] == 1.0
+    assert accuracy["retrieval"]["citation_accuracy"] == 1.0
+    assert accuracy["synthesis"]["coverage_accuracy"] == 1.0
+    assert accuracy["unanswerable"]["refusal_accuracy"] == 1.0
+    assert accuracy["claims"]["verdict_accuracy"] == 1.0
+    assert accuracy["visual_review"]["accuracy"] == 1.0
+    assert accuracy["failures"] == []
+
+
+def test_generated_accuracy_corpus_matches_its_manifest(tmp_path: Path):
+    manifest = load_accuracy_manifest()
+    generated = generate_accuracy_corpus(tmp_path)
+
+    assert set(generated) == set(manifest["courses"])
+    for course, expectation in manifest["courses"].items():
+        assert set(generated[course]) == set(expectation["sources"])
+        assert all(path.is_file() for path in generated[course].values())

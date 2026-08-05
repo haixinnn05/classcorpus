@@ -1,5 +1,5 @@
-from pathlib import Path
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from docx import Document
@@ -20,13 +20,9 @@ def test_registry_rejects_suffix_conflicts_and_invalid_plugins():
     registry.register(plugin)
 
     with pytest.raises(ValueError, match="already registered"):
-        registry.register(
-            ParserPlugin("second", (".ONE",), lambda path, output: [])
-        )
+        registry.register(ParserPlugin("second", (".ONE",), lambda path, output: []))
     with pytest.raises(ValueError, match="start with a dot"):
-        registry.register(
-            ParserPlugin("invalid", ("txt",), lambda path, output: [])
-        )
+        registry.register(ParserPlugin("invalid", ("txt",), lambda path, output: []))
 
     assert registry.parser_for(".ONE") == plugin
     assert registry.supported_suffixes() == frozenset({".one"})

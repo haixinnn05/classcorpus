@@ -1,0 +1,21 @@
+{
+  "name": "classcorpus",
+  "description": "Local-first study tools with exact course citations.",
+  "owner": {
+    "name": "Jackson Wu",
+    "url": "https://github.com/haixinnn05"
+  },
+  "plugins": [
+    {
+      "name": "classcorpus",
+      "source": "./",
+      "description": "Index local course materials and build citation-aware study artifacts.",
+      "category": "productivity",
+      "tags": [
+        "education",
+        "study",
+        "local-first"
+      ]
+    }
+  ]
+}

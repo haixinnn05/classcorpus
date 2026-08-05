@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from _common import argument_parser, emit, fail
+
 from classcorpus.database import Database, remove_course_data
 
 

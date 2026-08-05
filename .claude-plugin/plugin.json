@@ -1,0 +1,23 @@
+{
+  "name": "classcorpus",
+  "displayName": "ClassCorpus",
+  "version": "0.7.0",
+  "description": "Local, citation-aware course memory for PDFs, slides, documents, notes, and timed transcripts.",
+  "author": {
+    "name": "Jackson Wu",
+    "url": "https://github.com/haixinnn05"
+  },
+  "homepage": "https://github.com/haixinnn05/classcorpus",
+  "repository": "https://github.com/haixinnn05/classcorpus",
+  "license": "Apache-2.0",
+  "keywords": [
+    "education",
+    "study",
+    "lectures",
+    "citations",
+    "local-first"
+  ],
+  "skills": [
+    "./"
+  ]
+}

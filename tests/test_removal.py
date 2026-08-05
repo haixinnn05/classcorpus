@@ -187,15 +187,21 @@ def test_partial_cache_failure_removes_records_and_keeps_retry_manifest(
         remove_course_data(database, "Algorithms", confirmed=True)
 
     assert database.slide_count("Algorithms") == 0
-    assert database.connection.execute(
-        "SELECT COUNT(*) FROM pending_deletions"
-    ).fetchone()[0] == 1
+    assert (
+        database.connection.execute(
+            "SELECT COUNT(*) FROM pending_deletions"
+        ).fetchone()[0]
+        == 1
+    )
 
     monkeypatch.setattr("classcorpus.database.shutil.rmtree", original_rmtree)
     assert remove_course_data(database, "Algorithms", confirmed=True) is True
-    assert database.connection.execute(
-        "SELECT COUNT(*) FROM pending_deletions"
-    ).fetchone()[0] == 0
+    assert (
+        database.connection.execute(
+            "SELECT COUNT(*) FROM pending_deletions"
+        ).fetchone()[0]
+        == 0
+    )
 
 
 def test_pending_cleanup_preserves_cache_reused_by_new_course(
@@ -220,9 +226,9 @@ def test_pending_cleanup_preserves_cache_reused_by_new_course(
     with pytest.raises(OSError, match="cache is busy"):
         remove_course_data(database, "CS 101", confirmed=True)
     pending_path = Path(
-        database.connection.execute(
-            "SELECT path FROM pending_deletions"
-        ).fetchone()["path"]
+        database.connection.execute("SELECT path FROM pending_deletions").fetchone()[
+            "path"
+        ]
     )
 
     assert sync_course(database, "CS-101", second_root).indexed == 1
@@ -249,6 +255,9 @@ def test_pending_cleanup_preserves_cache_reused_by_new_course(
     assert cleaned == 1
     assert pending_path.is_dir()
     assert database.slide_count("CS-101") == 2
-    assert database.connection.execute(
-        "SELECT COUNT(*) FROM pending_deletions"
-    ).fetchone()[0] == 0
+    assert (
+        database.connection.execute(
+            "SELECT COUNT(*) FROM pending_deletions"
+        ).fetchone()[0]
+        == 0
+    )

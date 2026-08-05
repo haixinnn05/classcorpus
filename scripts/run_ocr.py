@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from _common import argument_parser, emit, fail
+
 from classcorpus.database import Database
 from classcorpus.ocr import TesseractAdapter, process_ocr_queue
 from classcorpus.security import mark_untrusted_content

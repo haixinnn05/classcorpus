@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from _common import argument_parser, emit, fail
+
 from classcorpus.database import Database
 from classcorpus.flashcard_html import DEFAULT_TITLE, write_flashcards_html
 from classcorpus.flashcards import load_flashcards
@@ -11,6 +12,7 @@ from classcorpus.provenance import (
     manifest_path,
     write_artifact_manifest,
 )
+from classcorpus.study_progress import identify_cards
 
 
 def main() -> int:
@@ -30,14 +32,16 @@ def main() -> int:
                 f"manifest already exists: {sidecar}; pass --overwrite to replace it"
             )
         cards = load_flashcards(args.input)
+        database = Database()
+        database.initialize()
+        identities = identify_cards(database, cards)
         write_flashcards_html(
             cards,
             args.output,
             title=args.title,
+            identities=identities,
             overwrite=args.overwrite,
         )
-        database = Database()
-        database.initialize()
         provenance = write_artifact_manifest(
             database,
             artifact=args.output,

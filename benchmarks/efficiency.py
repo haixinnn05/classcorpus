@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import math
+from dataclasses import asdict
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -56,8 +56,7 @@ def generate_efficiency_corpus(
         body = (
             f"# {title}\n\n"
             f"The unique retrieval marker for this record is {marker}. "
-            f"It identifies investigation {index:02d}.\n\n"
-            + shared_paragraph * 12
+            f"It identifies investigation {index:02d}.\n\n" + shared_paragraph * 12
         )
         (output_dir / source).write_text(body, encoding="utf-8")
         cases.append(
@@ -132,12 +131,9 @@ def run_token_efficiency_benchmark(
         "focused_evidence_complete": focused["evidence_accuracy"] == 1.0,
         "focused_rank_quality_unchanged": (
             focused["recall"] == adaptive["recall"]
-            and focused["mean_reciprocal_rank"]
-            == adaptive["mean_reciprocal_rank"]
+            and focused["mean_reciprocal_rank"] == adaptive["mean_reciprocal_rank"]
         ),
-        "focused_reduction_met": (
-            focused_reduction >= MIN_FOCUSED_REDUCTION
-        ),
+        "focused_reduction_met": (focused_reduction >= MIN_FOCUSED_REDUCTION),
         "focused_median_target_met": (
             focused["median_context_tokens"] <= MAX_FOCUSED_MEDIAN_TOKENS
         ),
@@ -146,25 +142,16 @@ def run_token_efficiency_benchmark(
         "rank_quality_unchanged": (
             adaptive["recall"] == standard["recall"]
             and adaptive["top_1_accuracy"] == standard["top_1_accuracy"]
-            and adaptive["mean_reciprocal_rank"]
-            == standard["mean_reciprocal_rank"]
+            and adaptive["mean_reciprocal_rank"] == standard["mean_reciprocal_rank"]
         ),
         "standard_reduction_met": standard_reduction >= MIN_STANDARD_REDUCTION,
         "full_reduction_met": full_reduction >= MIN_FULL_REDUCTION,
-        "median_target_met": (
-            adaptive["median_context_tokens"] <= MAX_MEDIAN_TOKENS
-        ),
+        "median_target_met": (adaptive["median_context_tokens"] <= MAX_MEDIAN_TOKENS),
         "p95_target_met": adaptive["p95_context_tokens"] <= MAX_P95_TOKENS,
     }
     failures = [
-        *[
-            {"workflow": "adaptive", **failure}
-            for failure in adaptive["failures"]
-        ],
-        *[
-            {"workflow": "standard", **failure}
-            for failure in standard["failures"]
-        ],
+        *[{"workflow": "adaptive", **failure} for failure in adaptive["failures"]],
+        *[{"workflow": "standard", **failure} for failure in standard["failures"]],
         *[{"workflow": "full", **failure} for failure in full["failures"]],
     ]
     failures.extend(
@@ -183,9 +170,7 @@ def run_token_efficiency_benchmark(
         },
         "thresholds": {
             "minimum_focused_reduction": MIN_FOCUSED_REDUCTION,
-            "maximum_focused_median_context_tokens": (
-                MAX_FOCUSED_MEDIAN_TOKENS
-            ),
+            "maximum_focused_median_context_tokens": (MAX_FOCUSED_MEDIAN_TOKENS),
             "minimum_standard_reduction": MIN_STANDARD_REDUCTION,
             "minimum_full_reduction": MIN_FULL_REDUCTION,
             "maximum_median_context_tokens": MAX_MEDIAN_TOKENS,
@@ -253,9 +238,7 @@ def _evaluate_focused_workflow(
         successful_cases += int(rank is not None)
         top_ranked_cases += int(rank == 1)
         selected = payload["selected"]
-        evidence_found = bool(
-            selected is not None and case["id"] in selected["text"]
-        )
+        evidence_found = bool(selected is not None and case["id"] in selected["text"])
         evidence_cases += int(evidence_found)
         if rank != 1 or not evidence_found:
             failures.append(
@@ -266,9 +249,7 @@ def _evaluate_focused_workflow(
                     "evidence_found": evidence_found,
                 }
             )
-        context_totals.append(
-            skill_tokens + int(payload["estimated_tokens"])
-        )
+        context_totals.append(skill_tokens + int(payload["estimated_tokens"]))
 
     case_count = len(cases)
     return {
@@ -284,9 +265,7 @@ def _evaluate_focused_workflow(
             sum(reciprocal_ranks) / case_count if case_count else 1.0
         ),
         "median_context_tokens": median(context_totals) if context_totals else 0,
-        "p95_context_tokens": percentile(context_totals, 0.95)
-        if context_totals
-        else 0,
+        "p95_context_tokens": percentile(context_totals, 0.95) if context_totals else 0,
         "aggregate_context_tokens": sum(context_totals),
         "failures": failures,
     }
@@ -334,9 +313,7 @@ def _evaluate_workflow(
                     "id": case["id"],
                     "expected_source": case["source"],
                     "rank": rank,
-                    "returned_sources": [
-                        result.source_file for result in results
-                    ],
+                    "returned_sources": [result.source_file for result in results],
                 }
             )
 
@@ -376,9 +353,7 @@ def _evaluate_workflow(
             sum(reciprocal_ranks) / case_count if case_count else 1.0
         ),
         "median_context_tokens": median(context_totals) if context_totals else 0,
-        "p95_context_tokens": percentile(context_totals, 0.95)
-        if context_totals
-        else 0,
+        "p95_context_tokens": percentile(context_totals, 0.95) if context_totals else 0,
         "aggregate_context_tokens": sum(context_totals),
         "failures": failures,
     }

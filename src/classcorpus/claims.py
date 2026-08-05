@@ -13,11 +13,12 @@ because that is where fabrication is both most damaging and most detectable.
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-import re
 from typing import Any
 
+from classcorpus.citations import resolve_citation
 from classcorpus.database import Database
 from classcorpus.provenance import CITATION_PATTERN
 from classcorpus.record_text import (
@@ -35,10 +36,6 @@ VERDICT_WEAK = "weak"
 VERDICT_UNSUPPORTED = "unsupported"
 VERDICT_UNVERIFIED = "unverified"
 
-_CITATION_PARTS = re.compile(
-    r"\[(?P<course>[^,\]]+),\s*(?P<source>[^,\]]+),\s*"
-    r"(?P<label>Slide|Page)\s+(?P<ordinal>\d+)\]"
-)
 _MEASUREMENT_PATTERNS = (
     # Complexity classes, including the Greek forms a renderer may produce.
     re.compile(r"(?:O|o|Theta|Omega|Θ|Ω)\s*\([^)]{1,60}\)"),
@@ -119,7 +116,7 @@ def check_claims(
     if not checks:
         payload["message"] = (
             "No citations found. Claims must cite records as "
-            "[Course, source, Page N]."
+            "[Course, source, Page N] or [Course, source, MM:SS]."
         )
     mark_untrusted_content(payload)
     return payload
@@ -138,15 +135,53 @@ def _cited_claims(text: str) -> list[tuple[str, int, str]]:
 
     A claim is the sentence, list item, or table row carrying the citation, so a
     paragraph citing three records yields three separately checkable claims.
+    A citation-only Markdown paragraph supports the preceding prose paragraph.
     """
     triples: list[tuple[str, int, str]] = []
-    for number, line in enumerate(text.splitlines(), start=1):
-        if not CITATION_PATTERN.search(line):
+    previous: tuple[str, int] | None = None
+    for block, number in _markdown_blocks(text):
+        citations = CITATION_PATTERN.findall(block)
+        prose = _claim_prose(block)
+        if not citations:
+            if prose and not prose.lstrip().startswith("#"):
+                previous = (block, number)
             continue
-        for unit in _claim_units(line):
-            for citation in CITATION_PATTERN.findall(unit):
-                triples.append((unit.strip(), number, citation))
+        if prose:
+            for unit in _claim_units(block.replace("\n", " ")):
+                for citation in CITATION_PATTERN.findall(unit):
+                    triples.append((unit.strip(), number, citation))
+            previous = (block, number)
+            continue
+        if previous is None:
+            continue
+        claim_block, claim_line = previous
+        for unit in _claim_units(claim_block.replace("\n", " ")):
+            for citation in citations:
+                triples.append((f"{unit} {citation}", claim_line, citation))
     return triples
+
+
+def _markdown_blocks(text: str) -> list[tuple[str, int]]:
+    blocks: list[tuple[str, int]] = []
+    lines: list[str] = []
+    start = 1
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.strip().startswith("```"):
+            if lines:
+                blocks.append(("\n".join(lines), start))
+                lines = []
+            continue
+        if not line.strip():
+            if lines:
+                blocks.append(("\n".join(lines), start))
+                lines = []
+            continue
+        if not lines:
+            start = number
+        lines.append(line)
+    if lines:
+        blocks.append(("\n".join(lines), start))
+    return blocks
 
 
 def _claim_units(line: str) -> list[str]:
@@ -185,17 +220,11 @@ def _check_one(
     haystack = _canonical(record)
     terms = _content_terms(prose)
     measurements = _measurements(prose)
-    missing_terms = tuple(
-        term for term in terms if not _contains_term(haystack, term)
-    )
+    missing_terms = tuple(term for term in terms if not _contains_term(haystack, term))
     missing_measurements = tuple(
-        value
-        for value in measurements
-        if _canonical(value) not in haystack
+        value for value in measurements if _canonical(value) not in haystack
     )
-    support = (
-        1.0 if not terms else (len(terms) - len(missing_terms)) / len(terms)
-    )
+    support = 1.0 if not terms else (len(terms) - len(missing_terms)) / len(terms)
 
     if missing_measurements:
         return ClaimCheck(
@@ -247,16 +276,16 @@ def _record_text(
 ) -> str | None:
     if citation in cache:
         return cache[citation]
-    parts = _CITATION_PARTS.fullmatch(citation.strip())
-    if parts is None:
+    location = resolve_citation(database, citation)
+    if location is None:
         cache[citation] = None
         return None
     try:
         chunk = read_record_text(
             database,
-            course=parts.group("course").strip(),
-            source_file=parts.group("source").strip(),
-            ordinal=int(parts.group("ordinal")),
+            course=location.course,
+            source_file=location.source_file,
+            ordinal=location.ordinal,
             field=field,
             offset=0,
             limit=MAX_RECORD_CHARS,
@@ -274,6 +303,7 @@ def _claim_prose(claim: str) -> str:
     value = re.sub(r"`([^`]*)`", r"\1", value)
     value = re.sub(r"\*\*([^*]*)\*\*", r"\1", value)
     value = re.sub(r"^#+\s*", "", value)
+    value = re.sub(r"^\s*(?:[-*+]|\d+\.)\s+", "", value)
     return value.strip()
 
 

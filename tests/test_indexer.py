@@ -63,9 +63,7 @@ def test_moved_course_refreshes_source_paths_without_reprocessing(
     assert report.skipped == 2
     assert {
         Path(row["source_path"]).parent
-        for row in database.connection.execute(
-            "SELECT source_path FROM source_files"
-        )
+        for row in database.connection.execute("SELECT source_path FROM source_files")
     } == {moved_root.resolve()}
 
 
@@ -136,9 +134,7 @@ def test_powerpoint_without_viewable_asset_returns_pdf_export_warning(
     report = sync_course(database, "Algorithms", root)
 
     warning = next(
-        item
-        for item in report.warnings
-        if item["type"] == "visual-source-unavailable"
+        item for item in report.warnings if item["type"] == "visual-source-unavailable"
     )
     assert warning["ordinal"] == "3"
     assert "PDF" in warning["message"]
@@ -167,9 +163,10 @@ def test_removed_source_is_pruned_from_index(
 
     assert report.skipped == 1
     assert database.slide_count("Algorithms") == 2
-    assert database.connection.execute(
-        "SELECT COUNT(*) FROM source_files"
-    ).fetchone()[0] == 1
+    assert (
+        database.connection.execute("SELECT COUNT(*) FROM source_files").fetchone()[0]
+        == 1
+    )
     assert all(not path.exists() for path in render_paths)
 
 
@@ -327,9 +324,7 @@ def test_sync_reports_record_completeness(
     assert report.records_indexed == 2
     assert report.records_review_needed == 1
     warning = next(
-        item
-        for item in report.warnings
-        if item["type"] == "extraction_review_needed"
+        item for item in report.warnings if item["type"] == "extraction_review_needed"
     )
     assert warning["ordinal"] == "2"
     assert "embedded-image" in warning["reasons"]

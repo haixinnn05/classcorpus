@@ -58,8 +58,10 @@ Produce atomic question-answer pairs. Include:
 Avoid cards unsupported by the retrieved course evidence.
 Use `references/flashcard-formats.md` as the normalized interchange schema.
 Save cited JSON first as the portable source, then run `render_flashcards.py`
-to create a self-contained interactive HTML deck by default. Give the user a
-readable question/answer list when HTML cannot be displayed. Use
+to create a self-contained adaptive HTML deck by default. The deck requires a
+confidence estimate before reveal and schedules Again/Hard/Good/Easy ratings;
+its progress JSON exchanges with `classcorpus review`. Give the user a readable
+question/answer list when HTML cannot be displayed. Use
 `convert_flashcards.py` only when the user requests CSV or TSV for another
 study tool. Preserve citations in every output.
 
@@ -68,9 +70,10 @@ study tool. Preserve citations in every output.
 The PDF study-guide and HTML flashcard renderers write a
 `.classcorpus.json` sidecar containing artifact, input, and indexed source
 hashes. Before delivering a generated artifact, run
-`classcorpus verify-artifact ARTIFACT --json`. A `current` status proves that
-the artifact is unchanged, every citation resolved, and its indexed source
-files still match. For other output formats, create the sidecar with
+`classcorpus verify-study CITED_INPUT --artifact ARTIFACT --json`. This combines
+claim support, citation resolution, cited-source freshness, extraction warnings,
+source representation, and artifact provenance. For other output formats,
+create the sidecar with
 `classcorpus manifest ARTIFACT --citations-from CITED_INPUT --json`.
 
 Do not remove the sidecar when sharing an artifact. It contains relative

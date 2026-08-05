@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
 import json
-from pathlib import Path
 import shlex
 import sys
-from typing import Any
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Never
 
 from classcorpus.claims import DEFAULT_SUPPORT_THRESHOLD, check_claims
 from classcorpus.database import Database, remove_course_data
 from classcorpus.demo import DEMO_COURSE_NAME, DEMO_QUERY, run_demo
 from classcorpus.diagnostics import doctor_report
 from classcorpus.encoders import create_encoder
+from classcorpus.flashcards import load_flashcards
 from classcorpus.indexer import sync_course
 from classcorpus.inspection import DEFAULT_INSPECT_CHARS, inspect_record
 from classcorpus.outline import (
@@ -32,12 +33,25 @@ from classcorpus.retrieval import (
 )
 from classcorpus.search import search, suggest_terms
 from classcorpus.security import mark_untrusted_content
-from classcorpus.skill import AGENT_SKILL_ROOTS, install_skill
+from classcorpus.skill import (
+    AGENT_SKILL_ROOTS,
+    agent_script_names,
+    install_skill,
+    run_agent_script,
+)
 from classcorpus.status import status_report
+from classcorpus.study_progress import (
+    RATINGS,
+    deck_progress,
+    export_progress,
+    import_progress,
+    record_review,
+)
+from classcorpus.study_verification import verify_study
 
 
 class CLIArgumentParser(argparse.ArgumentParser):
-    def error(self, message: str) -> None:
+    def error(self, message: str) -> Never:
         if "--json" in sys.argv[1:]:
             _emit_json(
                 {
@@ -279,6 +293,53 @@ def build_parser() -> CLIArgumentParser:
     _add_json_argument(verify_parser)
     verify_parser.set_defaults(handler=_run_verify_artifact)
 
+    study_verify_parser = subparsers.add_parser(
+        "verify-study",
+        help="Verify cited claims, source freshness, coverage, and artifacts.",
+    )
+    study_verify_parser.add_argument("source", type=Path)
+    study_verify_parser.add_argument("--artifact", type=Path)
+    study_verify_parser.add_argument(
+        "--field",
+        choices=RECORD_TEXT_FIELDS,
+        default="searchable",
+    )
+    study_verify_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=DEFAULT_SUPPORT_THRESHOLD,
+        help="Minimum share of claim wording that must appear in the record.",
+    )
+    study_verify_parser.add_argument(
+        "--require-all-sources",
+        action="store_true",
+        help="Fail unless every indexed source in each cited course is represented.",
+    )
+    _add_json_argument(study_verify_parser)
+    study_verify_parser.set_defaults(handler=_run_verify_study)
+
+    review_parser = subparsers.add_parser(
+        "review",
+        help="List, rate, export, or restore persistent flashcard progress.",
+    )
+    review_parser.add_argument("deck", type=Path)
+    review_parser.add_argument("--card")
+    review_parser.add_argument("--rating", choices=RATINGS)
+    review_parser.add_argument("--confidence", type=int)
+    review_parser.add_argument("--export-progress", type=Path)
+    review_parser.add_argument("--import-progress", type=Path)
+    review_parser.add_argument("--overwrite", action="store_true")
+    _add_json_argument(review_parser)
+    review_parser.set_defaults(handler=_run_review)
+
+    script_parser = subparsers.add_parser(
+        "script",
+        help="Run a bundled agent script in the ClassCorpus environment.",
+    )
+    script_parser.add_argument("name", choices=agent_script_names())
+    script_parser.add_argument("script_arguments", nargs=argparse.REMAINDER)
+    script_parser.set_defaults(handler=_run_agent_script, json_mode=False)
+
     outline_parser = subparsers.add_parser(
         "outline",
         help="Plan exhaustive coverage without loading complete record bodies.",
@@ -442,9 +503,7 @@ def _synchronize(
             f"failed {report.failed}; {report.records_indexed} records updated."
         )
         if report.records_review_needed:
-            print(
-                f"{report.records_review_needed} updated records need review."
-            )
+            print(f"{report.records_review_needed} updated records need review.")
     return 0 if report.failed == 0 else 1
 
 
@@ -505,7 +564,7 @@ def _run_search(arguments: argparse.Namespace) -> int:
         encoder=encoder,
     )
     health = database.source_health(arguments.course)
-    warnings = list(database.source_failures(arguments.course))
+    warnings: list[dict[str, object]] = list(database.source_failures(arguments.course))
     warnings.extend(
         {
             "type": "extraction_review_needed",
@@ -540,9 +599,7 @@ def _run_search(arguments: argparse.Namespace) -> int:
         results,
         warnings=warnings,
         sync_required=health.total == 0 or health.failed > 0,
-        suggested_terms=(
-            [] if results else suggest_terms(database, arguments.query)
-        ),
+        suggested_terms=([] if results else suggest_terms(database, arguments.query)),
         message=message,
         full=arguments.full,
         budget_tokens=arguments.budget_tokens,
@@ -764,9 +821,134 @@ def _run_verify_artifact(arguments: argparse.Namespace) -> int:
         _emit_json(payload)
     else:
         print(f"{payload['status']}: {payload['artifact']}")
+        delivery = payload.get("delivery")
+        if delivery:
+            print(f"Delivery: {_delivery_summary(delivery)}")
         for issue in payload["issues"]:
             print(f"- {issue['message']}")
     return 0 if payload["ok"] else 1
+
+
+def _run_verify_study(arguments: argparse.Namespace) -> int:
+    payload = verify_study(
+        _database(),
+        arguments.source,
+        artifact=arguments.artifact,
+        field=arguments.field,
+        threshold=arguments.threshold,
+        require_all_sources=arguments.require_all_sources,
+    )
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0 if payload["ok"] else 1
+
+    label = "VERIFIED" if payload["ok"] else "NOT VERIFIED"
+    summary = payload["summary"]
+    print(f"{label}: {payload['source']}")
+    print(
+        f"{summary['cited_claims']} cited claims: "
+        f"{summary['supported_claims']} supported, "
+        f"{summary['weak_claims']} weak, "
+        f"{summary['unsupported_claims']} unsupported, "
+        f"{summary['unverified_claims']} unverified."
+    )
+    print(f"{summary['resolved_citations']}/{summary['citations']} citations resolved.")
+    for coverage in payload["coverage"]:
+        print(
+            f"{coverage['course']}: {coverage['represented_sources']}/"
+            f"{coverage['total_sources']} sources represented."
+        )
+    for artifact in payload["artifacts"]:
+        print(f"Artifact {artifact['status']}: {artifact['artifact']}")
+        delivery = artifact.get("delivery")
+        if delivery:
+            print(f"  Delivery: {_delivery_summary(delivery)}")
+    for issue in payload["issues"]:
+        print(f"ERROR: {issue['message']}")
+    visible_warnings = payload["warnings"][:10]
+    for warning in visible_warnings:
+        print(f"WARNING: {warning['message']}")
+    hidden_warnings = len(payload["warnings"]) - len(visible_warnings)
+    if hidden_warnings:
+        print(f"WARNING: {hidden_warnings} more warning(s); use --json for details.")
+    return 0 if payload["ok"] else 1
+
+
+def _run_review(arguments: argparse.Namespace) -> int:
+    actions = sum(
+        value is not None
+        for value in (
+            arguments.rating,
+            arguments.export_progress,
+            arguments.import_progress,
+        )
+    )
+    if actions > 1:
+        raise ValueError(
+            "choose only one of --rating, --export-progress, or --import-progress"
+        )
+    if arguments.rating is not None and not arguments.card:
+        raise ValueError("--rating requires --card")
+    if arguments.card and arguments.rating is None:
+        raise ValueError("--card requires --rating")
+    if arguments.confidence is not None and arguments.rating is None:
+        raise ValueError("--confidence requires --rating")
+
+    database = _database()
+    cards = load_flashcards(arguments.deck)
+    if arguments.import_progress is not None:
+        payload = import_progress(database, arguments.import_progress)
+    elif arguments.export_progress is not None:
+        payload = export_progress(
+            database,
+            cards,
+            arguments.export_progress,
+            overwrite=arguments.overwrite,
+        )
+    elif arguments.rating is not None:
+        payload = record_review(
+            database,
+            cards,
+            card_id=arguments.card,
+            rating=arguments.rating,
+            confidence=arguments.confidence,
+        )
+    else:
+        payload = deck_progress(database, cards)
+
+    if arguments.json_mode:
+        _emit_json(payload)
+        return 0
+    if "summary" in payload:
+        summary = payload["summary"]
+        print(
+            f"{summary['cards']} cards: {summary['new']} new, "
+            f"{summary['due']} due, {summary['future']} scheduled, "
+            f"{summary['stale']} stale."
+        )
+        for card in payload["cards"]:
+            if card["status"] in {"new", "due", "stale"}:
+                print(f"{card['card_id']} [{card['status']}] {card['front']}")
+    elif "rating" in payload:
+        print(
+            f"Recorded {payload['rating']}; next due {payload['due_at']} "
+            f"({payload['interval_days']:.3g} days)."
+        )
+    elif "output" in payload:
+        print(
+            f"Exported {payload['reviews']} reviews and {payload['events']} "
+            f"events to {payload['output']}."
+        )
+    else:
+        print(f"Imported {payload['reviews']} reviews and {payload['events']} events.")
+    return 0
+
+
+def _run_agent_script(arguments: argparse.Namespace) -> int:
+    values = list(arguments.script_arguments)
+    if values and values[0] == "--":
+        values = values[1:]
+    return run_agent_script(arguments.name, values)
 
 
 def _run_status(arguments: argparse.Namespace) -> int:
@@ -778,7 +960,7 @@ def _run_status(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def _print_course_status(report: dict[str, object]) -> None:
+def _print_course_status(report: dict[str, Any]) -> None:
     if not report["courses"]:
         print("No matching indexed courses.")
         for action in report["next_actions"]:
@@ -816,6 +998,19 @@ def _run_doctor(arguments: argparse.Namespace) -> int:
                 print(f"  {check['action']}")
         print("Core requirements are ready." if report["ok"] else "Core checks failed.")
     return 0 if report["ok"] else 1
+
+
+def _delivery_summary(delivery: dict[str, object]) -> str:
+    if not delivery.get("ok"):
+        return str(delivery.get("error", "unreadable"))
+    if delivery.get("format") == "pdf":
+        return (
+            f"{delivery.get('rendered_pages', 0)}/{delivery.get('pages', 0)} "
+            f"PDF pages rendered; {delivery.get('text_chars', 0)} text characters."
+        )
+    if delivery.get("format") == "html":
+        return f"HTML parsed with {delivery.get('elements', 0)} elements."
+    return f"{delivery.get('bytes', 0)} bytes readable."
 
 
 def _database() -> Database:

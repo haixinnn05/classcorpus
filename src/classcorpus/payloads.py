@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import json
 import math
-from typing import Any, Iterable
+from dataclasses import asdict
+from typing import Any, Iterable, cast
 
 from classcorpus.citations import format_citation
 from classcorpus.search import SearchResult
@@ -83,7 +83,7 @@ def search_response(
         "sources": sources,
         "compact": True,
         "omitted_content_chars": sum(
-            int(item["omitted_content_chars"]) for item in payload_results
+            int(cast(Any, item["omitted_content_chars"])) for item in payload_results
         ),
         "budget_tokens": budget_tokens,
         "budget_exhausted": len(materialized) > len(visible),
@@ -167,8 +167,7 @@ def _allocate_evidence(
         )
         remaining_tokens = max(
             0,
-            budget_tokens
-            - estimate_tokens({**payload, "estimated_tokens": 0}),
+            budget_tokens - estimate_tokens({**payload, "estimated_tokens": 0}),
         )
         shortened = _truncate_text(result.snippet, remaining_tokens * 4)
         item["evidence"] = shortened
@@ -206,7 +205,7 @@ def _compact_sources(
             continue
         source_id = f"s{len(source_ids) + 1}"
         source_ids[key] = source_id
-        source = {
+        source: dict[str, object] = {
             "course": result.course,
             "source_file": result.source_file,
             "source_path": result.source_path,

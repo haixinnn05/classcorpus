@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from collections import Counter
 from dataclasses import dataclass
-import json
 from pathlib import Path
 from typing import Literal
 
@@ -102,7 +102,7 @@ def list_powerpoint_reviews(
         FROM slides
         JOIN source_files ON source_files.id = slides.source_file_id
         JOIN courses ON courses.id = source_files.course_id
-        WHERE {' AND '.join(filters)}
+        WHERE {" AND ".join(filters)}
         ORDER BY source_files.relative_path, slides.ordinal
         """,
         parameters,
@@ -182,9 +182,7 @@ def _review_item(
         assets=assets,
         review_state=review_state,
         next_action=next_action,
-        citation=(
-            f"[{row['course']}, {row['source_file']}, Slide {row['ordinal']}]"
-        ),
+        citation=(f"[{row['course']}, {row['source_file']}, Slide {row['ordinal']}]"),
     )
 
 
@@ -194,4 +192,3 @@ __all__ = [
     "PowerPointReviewReport",
     "list_powerpoint_reviews",
 ]
-

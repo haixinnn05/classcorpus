@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from _common import argument_parser, emit, fail
+
 from classcorpus.database import Database
 from classcorpus.record_text import RECORD_TEXT_FIELDS
 from classcorpus.retrieval import (

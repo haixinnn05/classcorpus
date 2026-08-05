@@ -24,7 +24,8 @@ returns `list[SlideRecord]`. It must:
 
 - Return one-based, contiguous ordinals.
 - Preserve native source text in `raw_text` without intentional truncation.
-- Use `slide` only for presentation slides and `page` for other ordered units.
+- Use `slide` for presentation slides, `page` for paged or document units, and
+  `transcript` for timed cues with nonnegative `start_ms` and `end_ms`.
 - Keep generated files under the supplied generated-data directory.
 - Mark uncertain extraction with `review-needed` and stable reason codes.
 - Never modify the source file.
@@ -56,3 +57,16 @@ The document title metadata is preferred as the record title; otherwise the
 first nonblank block is used. Embedded images, equations or objects, unmapped
 OOXML text, and empty documents produce explicit review reasons. DOCX files
 have no render; use a PDF export when layout or physical page position matters.
+
+## Built-In Transcript Plugin
+
+The `timed-transcripts` plugin handles UTF-8 `.vtt` and `.srt` files. Each timed
+cue becomes one transcript record with a one-based ordinal and preserved start
+and end milliseconds. WebVTT headers, cue IDs, timing settings, NOTE, STYLE, and
+REGION blocks are handled locally; cue tags are stripped from searchable text
+while the original cue payload remains in `raw_text`.
+
+Canonical citations use the cue start time, such as
+`[Algorithms, Lecture08.vtt, 14:32.500]`. Invalid timestamps, backwards cue
+ranges, malformed SRT blocks, and files with no timed text fail the source
+parse instead of producing ambiguous evidence.

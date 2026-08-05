@@ -9,8 +9,10 @@ are copied, so a package install and a clone produce the same skill directory.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import shutil
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any, Iterable
 
 SKILL_ASSETS = ("SKILL.md", "references", "scripts")
@@ -21,6 +23,8 @@ AGENT_SKILL_ROOTS: dict[str, tuple[str, str]] = {
     # agent -> (environment variable holding the agent home, default home)
     "claude": ("CLAUDE_HOME", "~/.claude"),
     "codex": ("CODEX_HOME", "~/.codex"),
+    "copilot": ("COPILOT_HOME", "~/.copilot"),
+    "gemini": ("GEMINI_HOME", "~/.gemini"),
 }
 
 
@@ -46,9 +50,11 @@ def agent_skill_directory(agent: str) -> Path:
     """Return the skills directory for one supported agent."""
     try:
         variable, default_home = AGENT_SKILL_ROOTS[agent]
-    except KeyError:
+    except KeyError as error:
         supported = ", ".join(sorted(AGENT_SKILL_ROOTS))
-        raise ValueError(f"unknown agent: {agent}. Choose one of: {supported}")
+        raise ValueError(
+            f"unknown agent: {agent}. Choose one of: {supported}"
+        ) from error
     home = os.environ.get(variable) or default_home
     return Path(home).expanduser() / "skills"
 
@@ -71,8 +77,8 @@ def install_skill(
     """Copy the skill assets into one or more skills directories.
 
     With no arguments, installs for every detected agent, because a user with
-    both Claude Code and Codex wants the skill in both. `agent` narrows that to
-    one, and `target` installs into an exact directory instead.
+    multiple supported agents wants the skill in each one. `agent` narrows that
+    to one, and `target` installs into an exact directory instead.
 
     Refuses to replace an existing directory that ClassCorpus did not install,
     unless `overwrite` is explicit.
@@ -81,6 +87,7 @@ def install_skill(
         raise ValueError("choose either an agent or an explicit target, not both")
 
     source = asset_root()
+    destinations: list[tuple[str | None, Path]]
     if target is not None:
         destinations = [(None, target.expanduser().resolve())]
     else:
@@ -183,13 +190,38 @@ def bundled_asset_files(root: Path | None = None) -> Iterable[Path]:
             yield path
 
 
+def agent_script_names() -> tuple[str, ...]:
+    """Return public agent-facing script names without implementation helpers."""
+    directory = asset_root() / "scripts"
+    return tuple(
+        path.stem
+        for path in sorted(directory.glob("*.py"))
+        if not path.name.startswith("_")
+    )
+
+
+def run_agent_script(name: str, arguments: Iterable[str]) -> int:
+    """Run a bundled script with the package's own Python environment."""
+    if name not in agent_script_names():
+        choices = ", ".join(agent_script_names())
+        raise ValueError(f"unknown agent script: {name}. Choose one of: {choices}")
+    script = asset_root() / "scripts" / f"{name}.py"
+    completed = subprocess.run(
+        [sys.executable, str(script), *arguments],
+        check=False,
+    )
+    return completed.returncode
+
+
 __all__ = [
     "AGENT_SKILL_ROOTS",
     "SKILL_ASSETS",
     "SKILL_DIRECTORY_NAME",
     "agent_skill_directory",
+    "agent_script_names",
     "asset_root",
     "bundled_asset_files",
     "detect_agents",
     "install_skill",
+    "run_agent_script",
 ]

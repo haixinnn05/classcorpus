@@ -108,6 +108,8 @@ def test_open_source_repository_artifacts_exist():
         ".github/ISSUE_TEMPLATE/feature_request.yml",
         ".github/pull_request_template.md",
         ".github/dependabot.yml",
+        ".claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json",
         "examples/README.md",
     )
 
@@ -117,9 +119,7 @@ def test_open_source_repository_artifacts_exist():
 
 def test_reference_docs_define_exhaustive_read_contract():
     schema = (ROOT / "references/record-schema.md").read_text(encoding="utf-8")
-    workflows = (ROOT / "references/study-workflows.md").read_text(
-        encoding="utf-8"
-    )
+    workflows = (ROOT / "references/study-workflows.md").read_text(encoding="utf-8")
 
     assert "read_lectures.py" in schema
     assert "total_records" in schema
@@ -166,6 +166,7 @@ def test_skill_defines_flashcard_interchange_and_overwrite_boundary(
 
     assert "convert_flashcards.py" in skill_text
     assert "render_flashcards.py" in skill_text
+    assert "classcorpus review DECK.json" in skill_text
     assert "default interactive deck" in skill_text
     assert "readable text when HTML cannot be displayed" in skill_text
     assert "--overwrite" in skill_text
@@ -191,9 +192,12 @@ def test_skill_and_public_docs_define_unified_cli(skill_text: str):
     assert "classcorpus read COURSE SOURCE ORDINAL" in cli_text
     assert "classcorpus inspect COURSE SOURCE ORDINAL" in cli_text
     assert "classcorpus inspect COURSE SOURCE ORDINAL" in skill_text
+    assert "verify-study" in skill_text
     assert "classcorpus doctor" in readme
     assert "classcorpus demo" in readme
     assert "classcorpus demo" in cli_text
+    assert "classcorpus script NAME" in cli_text
+    assert "classcorpus script NAME ARGS" in skill_text
 
     retrieval_guide = ROOT / "docs/retrieval-guide.md"
     assert retrieval_guide.is_file()
@@ -203,6 +207,7 @@ def test_skill_and_public_docs_define_unified_cli(skill_text: str):
     assert "classcorpus inspect" in guide_text
     assert "classcorpus outline" in guide_text
     assert "verify-artifact" in guide_text
+    assert "verify-study" in guide_text
     assert retrieval_guide.name in readme
 
 

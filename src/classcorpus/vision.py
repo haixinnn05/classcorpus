@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence, cast
 
 from classcorpus.database import Database
 from classcorpus.models import ExtractionStatus, VisualAsset
@@ -99,9 +99,7 @@ def get_vision_queue(
                 title=str(row["title"]),
                 render_path=render_path,
                 extraction_status=row["extraction_status"],
-                extraction_reasons=tuple(
-                    json.loads(row["extraction_reasons"])
-                ),
+                extraction_reasons=tuple(json.loads(row["extraction_reasons"])),
                 assets=assets,
                 asset_paths=tuple(asset.path for asset in assets),
                 warning=warning,
@@ -120,7 +118,7 @@ def store_descriptions(
     seen: set[int] = set()
     for item in descriptions:
         try:
-            slide_id = int(item["slide_id"])
+            slide_id = int(cast(Any, item["slide_id"]))
             description = str(item["description"]).strip()
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError(
@@ -152,17 +150,13 @@ def store_descriptions(
             "SELECT render_path FROM slides WHERE id = ?",
             (slide_id,),
         ).fetchone()
-        render_exists = bool(
-            row["render_path"] and Path(row["render_path"]).is_file()
-        )
+        render_exists = bool(row["render_path"] and Path(row["render_path"]).is_file())
         asset_exists = any(
             Path(asset.path).is_file()
             for asset in database.visual_assets_for_slide(slide_id)
         )
         if not render_exists and not asset_exists:
-            raise ValueError(
-                f"slide_id {slide_id} has no viewable render or asset"
-            )
+            raise ValueError(f"slide_id {slide_id} has no viewable render or asset")
 
     with database.connection:
         for slide_id, description in prepared:

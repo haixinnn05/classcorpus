@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -85,9 +85,7 @@ class TesseractAdapter:
                     confidences.append(min(confidence, 100.0) / 100.0)
         return OCRResult(
             text=" ".join(words),
-            confidence=(
-                sum(confidences) / len(confidences) if confidences else 0.0
-            ),
+            confidence=(sum(confidences) / len(confidences) if confidences else 0.0),
         )
 
 
@@ -252,4 +250,3 @@ __all__ = [
     "get_ocr_queue",
     "process_ocr_queue",
 ]
-

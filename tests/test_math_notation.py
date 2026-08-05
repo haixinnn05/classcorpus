@@ -8,9 +8,7 @@ from classcorpus.math_notation import (
 
 
 def test_compact_matrix_uses_stacked_rows_and_columns():
-    normalized = normalize_math_expression(
-        "A = [[1, 2, 0], [0, 1, 1], [1, 2, 0]]"
-    )
+    normalized = normalize_math_expression("A = [[1, 2, 0], [0, 1, 1], [1, 2, 0]]")
 
     assert normalized == (
         r"A = \left[\substack{"
@@ -24,15 +22,11 @@ def test_compact_matrix_uses_stacked_rows_and_columns():
 def test_transposed_vector_becomes_column_vector():
     normalized = normalize_math_expression("Ax = [3, 0, -1]^T")
 
-    assert normalized == (
-        r"Ax = \left[\substack{3\\0\\-1}\right]"
-    )
+    assert normalized == (r"Ax = \left[\substack{3\\0\\-1}\right]")
 
 
 def test_matrix_fractions_and_named_functions_are_typeset():
-    normalized = normalize_math_expression(
-        "P = [[-1/2, 1/2], [1, 0]]; det(P) != 0"
-    )
+    normalized = normalize_math_expression("P = [[-1/2, 1/2], [1, 0]]; det(P) != 0")
 
     assert r"-\frac{1}{2}" in normalized
     assert r"\frac{1}{2}" in normalized
@@ -41,13 +35,9 @@ def test_matrix_fractions_and_named_functions_are_typeset():
 
 
 def test_greek_names_and_parenthesized_fraction_are_typeset():
-    normalized = normalize_math_expression(
-        "lambda = (-b + sqrt(Delta)) / (2a)"
-    )
+    normalized = normalize_math_expression("lambda = (-b + sqrt(Delta)) / (2a)")
 
-    assert normalized == (
-        r"\lambda = \frac{-b + \sqrt{\Delta}}{2a}"
-    )
+    assert normalized == (r"\lambda = \frac{-b + \sqrt{\Delta}}{2a}")
 
 
 def test_inline_greek_names_work_before_subscripts():
@@ -56,15 +46,11 @@ def test_inline_greek_names_work_before_subscripts():
 
 
 def test_inline_latex_operators_fractions_and_roots_are_readable():
-    assert normalize_inline_math(
-        r"\frac{1}{2} \le sqrt(Delta)"
-    ) == "1/2 ≤ √(Δ)"
+    assert normalize_inline_math(r"\frac{1}{2} \le sqrt(Delta)") == "1/2 ≤ √(Δ)"
 
 
 def test_vector_set_keeps_its_closing_brace():
-    normalized = normalize_math_expression(
-        "Col(A) = span{[1, 2]^T, [3, 4]^T}"
-    )
+    normalized = normalize_math_expression("Col(A) = span{[1, 2]^T, [3, 4]^T}")
 
     assert normalized.startswith(r"\mathrm{Col}(A) = \mathrm{span}{")
     assert normalized.endswith(r"\right]}")
@@ -95,12 +81,14 @@ def test_standalone_equations_are_detected_conservatively():
     assert looks_like_display_math("A = [[1, 2], [3, 4]]") is True
     assert looks_like_display_math("x^2 + y^2 = r^2") is True
     assert looks_like_display_math(r"\sum_{i=1}^{n} a_i = b") is True
-    assert looks_like_display_math(
-        "Average velocity = displacement divided by elapsed time."
-    ) is False
-    assert looks_like_display_math(
-        "[Math, lecture.pdf, Page 4]"
-    ) is False
+    assert (
+        looks_like_display_math(
+            "Average velocity = displacement divided by elapsed time."
+        )
+        is False
+    )
+    assert looks_like_display_math("[Math, lecture.pdf, Page 4]") is False
+    assert looks_like_display_math("[Math, lecture.vtt, 14:32.500]") is False
 
 
 def test_display_math_delimiters_are_removed():

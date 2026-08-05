@@ -11,8 +11,13 @@ confirm an issue was opened first so the approach could be agreed.
 
 ```bash
 .venv/bin/ruff check benchmarks src scripts tests
-.venv/bin/python -m pytest -q
+.venv/bin/ruff format --check benchmarks src scripts tests
+.venv/bin/mypy
+.venv/bin/coverage run -m pytest -q
+.venv/bin/coverage combine
+.venv/bin/coverage report
 .venv/bin/python -m benchmarks.run
+.venv/bin/python -m benchmarks.scale
 ```
 
 - [ ] Lint, tests, and the benchmark pass locally
@@ -30,7 +35,7 @@ Confirm the change preserves the project's architecture:
 - [ ] No telemetry, hosted backend, web server, custom chatbot, or required
       provider API
 - [ ] Source-derived payloads remain marked as untrusted evidence
-- [ ] Exact source paths and one-based page or slide citations are preserved
+- [ ] Exact source paths and canonical page, slide, or timestamp citations are preserved
 - [ ] Visual analysis remains opt-in
 
 ## Compatibility and privacy

@@ -44,8 +44,7 @@ def test_inspect_returns_exact_evidence_preview_and_current_hash(
     assert payload["content_trust"] == "untrusted"
     assert "Bellman-Ford" in payload["text"]
     assert any(
-        warning["type"] == "extraction_review_needed"
-        for warning in payload["warnings"]
+        warning["type"] == "extraction_review_needed" for warning in payload["warnings"]
     )
 
 
@@ -82,9 +81,7 @@ def test_inspect_detects_stale_parser_and_builds_continuation(
 ):
     database, _ = inspected_course
     with database.connection:
-        database.connection.execute(
-            "UPDATE source_files SET parser_version = 'old'"
-        )
+        database.connection.execute("UPDATE source_files SET parser_version = 'old'")
 
     payload = inspect_record(
         database,

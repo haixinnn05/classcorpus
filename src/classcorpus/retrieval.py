@@ -33,13 +33,9 @@ def retrieve_focused(
     read_limit: int = DEFAULT_FOCUSED_READ_CHARS,
 ) -> dict[str, Any]:
     if field not in RECORD_TEXT_FIELDS:
-        raise ValueError(
-            "field must be one of: " + ", ".join(RECORD_TEXT_FIELDS)
-        )
+        raise ValueError("field must be one of: " + ", ".join(RECORD_TEXT_FIELDS))
     if read_limit < 1 or read_limit > MAX_CHUNK_CHARS:
-        raise ValueError(
-            f"read_limit must be between 1 and {MAX_CHUNK_CHARS}"
-        )
+        raise ValueError(f"read_limit must be between 1 and {MAX_CHUNK_CHARS}")
 
     results = search(
         database,
@@ -50,7 +46,7 @@ def retrieve_focused(
         limit=limit,
     )
     health = database.source_health(course)
-    warnings = list(database.source_failures(course))
+    warnings: list[dict[str, object]] = list(database.source_failures(course))
     warnings.extend(
         {
             "type": "extraction_review_needed",
@@ -130,17 +126,13 @@ def _record_text(
         ("Visual description", result.visual_description),
         ("OCR", result.ocr_text),
     ]
-    return "\n\n".join(
-        f"{label}:\n{value}" for label, value in parts if value
-    )
+    return "\n\n".join(f"{label}:\n{value}" for label, value in parts if value)
 
 
 def _passage_offset(text: str, query: str, limit: int) -> int:
     if len(text) <= limit:
         return 0
-    terms = list(
-        dict.fromkeys(re.findall(r"\w+", query.casefold(), flags=re.UNICODE))
-    )
+    terms = list(dict.fromkeys(re.findall(r"\w+", query.casefold(), flags=re.UNICODE)))
     if not terms:
         return 0
     anchors = [

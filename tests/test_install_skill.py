@@ -1,8 +1,8 @@
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -24,8 +24,8 @@ def run_cli(
     environment: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env.pop("CLAUDE_HOME", None)
-    env.pop("CODEX_HOME", None)
+    for variable in ("CLAUDE_HOME", "CODEX_HOME", "COPILOT_HOME", "GEMINI_HOME"):
+        env.pop(variable, None)
     python_path = env.get("PYTHONPATH")
     source_path = str(ROOT / "src")
     env["PYTHONPATH"] = (
@@ -54,7 +54,9 @@ def test_every_skill_asset_is_accounted_for():
     names = {path.name for path in files}
 
     assert "SKILL.md" in names
-    assert any(path.suffix == ".md" and path.parent.name == "references" for path in files)
+    assert any(
+        path.suffix == ".md" and path.parent.name == "references" for path in files
+    )
     assert any(path.suffix == ".py" and path.parent.name == "scripts" for path in files)
 
 
@@ -152,9 +154,13 @@ def test_agent_skill_directory_follows_the_agent_home(
 ):
     monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude"))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
+    monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "copilot"))
+    monkeypatch.setenv("GEMINI_HOME", str(tmp_path / "gemini"))
 
     assert agent_skill_directory("claude") == tmp_path / "claude" / "skills"
     assert agent_skill_directory("codex") == tmp_path / "codex" / "skills"
+    assert agent_skill_directory("copilot") == tmp_path / "copilot" / "skills"
+    assert agent_skill_directory("gemini") == tmp_path / "gemini" / "skills"
 
 
 def test_unknown_agent_is_rejected():
@@ -169,6 +175,8 @@ def test_detects_only_agents_that_are_present(
     (tmp_path / "claude").mkdir()
     monkeypatch.setenv("CLAUDE_HOME", str(tmp_path / "claude"))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "absent"))
+    monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "absent-copilot"))
+    monkeypatch.setenv("GEMINI_HOME", str(tmp_path / "absent-gemini"))
 
     assert detect_agents() == ["claude"]
 
@@ -207,6 +215,8 @@ def test_cli_reports_a_helpful_error_when_no_agent_is_present(tmp_path: Path):
         environment={
             "CLAUDE_HOME": str(tmp_path / "absent-claude"),
             "CODEX_HOME": str(tmp_path / "absent-codex"),
+            "COPILOT_HOME": str(tmp_path / "absent-copilot"),
+            "GEMINI_HOME": str(tmp_path / "absent-gemini"),
         },
     )
 
@@ -227,6 +237,8 @@ def test_cli_installs_for_every_detected_agent(tmp_path: Path):
         environment={
             "CLAUDE_HOME": str(tmp_path / "claude-home"),
             "CODEX_HOME": str(tmp_path / "codex-home"),
+            "COPILOT_HOME": str(tmp_path / "absent-copilot"),
+            "GEMINI_HOME": str(tmp_path / "absent-gemini"),
         },
     )
 
@@ -250,6 +262,8 @@ def test_agent_narrows_installation_to_one(tmp_path: Path):
         environment={
             "CLAUDE_HOME": str(tmp_path / "claude-home"),
             "CODEX_HOME": str(tmp_path / "codex-home"),
+            "COPILOT_HOME": str(tmp_path / "absent-copilot"),
+            "GEMINI_HOME": str(tmp_path / "absent-gemini"),
         },
     )
 

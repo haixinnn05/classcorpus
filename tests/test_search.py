@@ -196,12 +196,15 @@ def test_search_filters_by_source_file_and_ordinal(indexed_course: Database):
     assert [(result.source_file, result.ordinal) for result in results] == [
         ("Lecture08.pptx", 2)
     ]
-    assert search(
-        indexed_course,
-        "Bellman-Ford",
-        course="Algorithms",
-        source_file="Lecture08.pptx",
-    ) == []
+    assert (
+        search(
+            indexed_course,
+            "Bellman-Ford",
+            course="Algorithms",
+            source_file="Lecture08.pptx",
+        )
+        == []
+    )
 
 
 def test_search_rejects_blank_query(indexed_course: Database):

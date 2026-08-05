@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import fitz
 import pytest
 
 from classcorpus.database import Database
@@ -33,8 +34,7 @@ def cited_artifact(
     artifact.write_text("<h1>Resonance</h1>", encoding="utf-8")
     citation_source = tmp_path / "study-guide.md"
     citation_source.write_text(
-        "Resonance maximizes amplitude. "
-        "[Physics, Fall, lecture, one.md, Page 1]",
+        "Resonance maximizes amplitude. [Physics, Fall, lecture, one.md, Page 1]",
         encoding="utf-8",
     )
     return database, source, artifact, citation_source
@@ -68,6 +68,69 @@ def test_manifest_resolves_citations_without_private_source_paths(
     assert str(source.parent.resolve()) not in stored
     assert json.loads(stored)["artifact"] == artifact.name
     assert verify_artifact(database, artifact)["status"] == "current"
+
+
+def test_verify_rejects_a_hash_current_but_unreadable_pdf(
+    cited_artifact: tuple[Database, Path, Path, Path],
+):
+    database, _, artifact, citation_source = cited_artifact
+    artifact = artifact.with_suffix(".pdf")
+    artifact.write_bytes(b"%PDF-1.4\nnot a readable document\n")
+    write_artifact_manifest(
+        database,
+        artifact=artifact,
+        citation_source=citation_source,
+    )
+
+    payload = verify_artifact(database, artifact)
+
+    assert payload["ok"] is False
+    assert payload["status"] == "artifact-unreadable"
+    assert payload["delivery"]["ok"] is False
+    assert any(issue["type"] == "artifact_unreadable" for issue in payload["issues"])
+
+
+def test_verify_rejects_hash_current_but_empty_html(
+    cited_artifact: tuple[Database, Path, Path, Path],
+):
+    database, _, artifact, citation_source = cited_artifact
+    artifact.write_text("", encoding="utf-8")
+    write_artifact_manifest(
+        database,
+        artifact=artifact,
+        citation_source=citation_source,
+    )
+
+    payload = verify_artifact(database, artifact)
+
+    assert payload["ok"] is False
+    assert payload["status"] == "artifact-unreadable"
+    assert payload["delivery"]["format"] == "html"
+
+
+def test_verify_renders_every_page_of_a_valid_pdf(
+    cited_artifact: tuple[Database, Path, Path, Path],
+):
+    database, _, artifact, citation_source = cited_artifact
+    artifact = artifact.with_suffix(".pdf")
+    document = fitz.open()
+    for label in ("Page one", "Page two"):
+        page = document.new_page()
+        page.insert_text((72, 72), label)
+    document.save(artifact)
+    document.close()
+    write_artifact_manifest(
+        database,
+        artifact=artifact,
+        citation_source=citation_source,
+    )
+
+    payload = verify_artifact(database, artifact)
+
+    assert payload["ok"] is True
+    assert payload["delivery"]["pages"] == 2
+    assert payload["delivery"]["rendered_pages"] == 2
+    assert payload["delivery"]["text_chars"] > 0
 
 
 def test_manifest_refuses_to_replace_existing_sidecar(
@@ -172,9 +235,7 @@ def test_unresolved_citation_creates_unverified_manifest(
     verified = verify_artifact(database, artifact)
 
     assert manifest["citations"] == []
-    assert manifest["unresolved_citations"] == [
-        "[Physics, Fall, missing.pdf, Page 9]"
-    ]
+    assert manifest["unresolved_citations"] == ["[Physics, Fall, missing.pdf, Page 9]"]
     assert verified["ok"] is False
     assert verified["status"] == "unverified"
     assert verified["issues"][0]["type"] == "citation_unresolved"

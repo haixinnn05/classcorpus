@@ -45,9 +45,7 @@ def test_report_classifies_reviewability_and_next_actions(
     assert picture.next_action == "inspect-assets"
     assert len(picture.assets) == 3
     assert picture.citation == "[Algorithms, Lecture08.pptx, Slide 1]"
-    assert all(
-        item.next_action == "export-to-pdf" for item in report.items[1:]
-    )
+    assert all(item.next_action == "export-to-pdf" for item in report.items[1:])
 
 
 def test_report_filters_reasons_and_paginates_without_hiding_total(

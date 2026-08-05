@@ -1,6 +1,6 @@
 import json
-import sqlite3
 import shutil
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS slides (
     ocr_backend TEXT,
     ocr_status TEXT NOT NULL DEFAULT 'pending'
         CHECK(ocr_status IN ('pending', 'complete', 'failed')),
+    start_ms INTEGER CHECK(start_ms IS NULL OR start_ms >= 0),
+    end_ms INTEGER CHECK(end_ms IS NULL OR end_ms >= 0),
     UNIQUE(source_file_id, ordinal)
 );
 
@@ -100,6 +102,35 @@ CREATE TABLE IF NOT EXISTS slide_embeddings (
 CREATE TABLE IF NOT EXISTS pending_deletions (
     path TEXT PRIMARY KEY
 );
+
+CREATE TABLE IF NOT EXISTS flashcard_reviews (
+    card_id TEXT PRIMARY KEY,
+    card_key TEXT NOT NULL,
+    source_sha256 TEXT NOT NULL,
+    citation TEXT NOT NULL,
+    repetitions INTEGER NOT NULL DEFAULT 0 CHECK(repetitions >= 0),
+    lapses INTEGER NOT NULL DEFAULT 0 CHECK(lapses >= 0),
+    interval_days REAL NOT NULL DEFAULT 0 CHECK(interval_days >= 0),
+    ease REAL NOT NULL DEFAULT 2.5 CHECK(ease >= 1.3),
+    due_at TEXT NOT NULL,
+    last_reviewed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS flashcard_reviews_card_key
+ON flashcard_reviews(card_key, updated_at);
+
+CREATE TABLE IF NOT EXISTS flashcard_review_events (
+    id INTEGER PRIMARY KEY,
+    card_id TEXT NOT NULL,
+    rating TEXT NOT NULL CHECK(rating IN ('again', 'hard', 'good', 'easy')),
+    confidence INTEGER CHECK(confidence BETWEEN 1 AND 5),
+    reviewed_at TEXT NOT NULL,
+    previous_due_at TEXT,
+    new_due_at TEXT NOT NULL,
+    UNIQUE(card_id, reviewed_at, rating)
+);
 """
 
 
@@ -121,8 +152,11 @@ class Database:
     def __init__(self, path: Path | None = None):
         self.path = (path or database_path()).expanduser()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.path)
+        self.connection = sqlite3.connect(self.path, timeout=30.0)
         self.connection.row_factory = sqlite3.Row
+        self.connection.execute("PRAGMA busy_timeout = 30000")
+        self.connection.execute("PRAGMA journal_mode = WAL")
+        self.connection.execute("PRAGMA synchronous = NORMAL")
         self.connection.execute("PRAGMA foreign_keys = ON")
 
     def initialize(self) -> None:
@@ -218,7 +252,7 @@ class Database:
         source_path: Path,
         fingerprint: SourceFingerprint,
         slides: Sequence[SlideRecord],
-    ) -> tuple[dict[str, str], ...]:
+    ) -> tuple[dict[str, object], ...]:
         old_render_directories: set[Path] = set()
         with self.connection:
             source_row = self.connection.execute(
@@ -281,6 +315,20 @@ class Database:
             ).fetchone()["id"]
 
             for slide in slides:
+                if slide.kind == "transcript" and (
+                    slide.start_ms is None
+                    or slide.end_ms is None
+                    or slide.start_ms < 0
+                    or slide.end_ms <= slide.start_ms
+                ):
+                    raise ValueError(
+                        "transcript records require a nonnegative start_ms and "
+                        "an end_ms after the start"
+                    )
+                if slide.kind != "transcript" and (
+                    slide.start_ms is not None or slide.end_ms is not None
+                ):
+                    raise ValueError("timestamps are only valid on transcript records")
                 reasons_json = json.dumps(
                     slide.extraction_reasons,
                     ensure_ascii=True,
@@ -293,14 +341,14 @@ class Database:
                         speaker_notes, raw_text, extraction_status,
                         extraction_reasons, native_text_chars,
                         has_visual_content, visual_description,
-                        render_path, vision_status
+                        render_path, vision_status, start_ms, end_ms
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         source_id,
                         slide.ordinal,
-                        slide.kind,
+                        "page" if slide.kind == "transcript" else slide.kind,
                         slide.title,
                         slide.body_text,
                         slide.speaker_notes,
@@ -312,6 +360,8 @@ class Database:
                         slide.visual_description,
                         slide.render_path,
                         "complete" if slide.visual_description else "pending",
+                        slide.start_ms,
+                        slide.end_ms,
                     ),
                 )
                 slide_id = cursor.lastrowid
@@ -427,7 +477,7 @@ class Database:
         self,
         course_id: int,
         present_relative_paths: set[str],
-    ) -> tuple[int, tuple[dict[str, str], ...]]:
+    ) -> tuple[int, tuple[dict[str, object], ...]]:
         parameters: list[object] = [course_id]
         present_clause = ""
         if present_relative_paths:
@@ -469,10 +519,10 @@ class Database:
     def cleanup_render_directories(
         self,
         directories: set[Path],
-    ) -> tuple[dict[str, str], ...]:
+    ) -> tuple[dict[str, object], ...]:
         if not directories:
             return ()
-        warnings: list[dict[str, str]] = []
+        warnings: list[dict[str, object]] = []
         try:
             render_rows = self.connection.execute(
                 "SELECT render_path FROM slides WHERE render_path IS NOT NULL"
@@ -485,8 +535,7 @@ class Database:
                 "SELECT path FROM visual_assets"
             ).fetchall()
             referenced.update(
-                _asset_generation_directory(Path(row["path"]))
-                for row in asset_rows
+                _asset_generation_directory(Path(row["path"])) for row in asset_rows
             )
         except (OSError, TypeError, ValueError, sqlite3.Error) as error:
             return (
@@ -612,8 +661,7 @@ class Database:
 
     def _migrate_slides(self) -> None:
         columns = {
-            row["name"]
-            for row in self.connection.execute("PRAGMA table_info(slides)")
+            row["name"] for row in self.connection.execute("PRAGMA table_info(slides)")
         }
         additions = {
             "raw_text": "TEXT NOT NULL DEFAULT ''",
@@ -627,6 +675,8 @@ class Database:
             "ocr_confidence": "REAL",
             "ocr_backend": "TEXT",
             "ocr_status": "TEXT NOT NULL DEFAULT 'pending'",
+            "start_ms": "INTEGER CHECK(start_ms IS NULL OR start_ms >= 0)",
+            "end_ms": "INTEGER CHECK(end_ms IS NULL OR end_ms >= 0)",
         }
         added_columns: set[str] = set()
         for name, declaration in additions.items():
@@ -725,7 +775,7 @@ class Database:
     def source_failures(
         self,
         course_name: str | None = None,
-    ) -> tuple[dict[str, str], ...]:
+    ) -> tuple[dict[str, object], ...]:
         parameters: list[object] = []
         course_clause = ""
         if course_name is not None:
